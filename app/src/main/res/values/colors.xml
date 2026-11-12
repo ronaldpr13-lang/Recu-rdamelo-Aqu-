@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand">#0B7A6E</color>
+    <color name="brand_on">#FFFFFF</color>
+    <color name="brand_container">#B8EEE4</color>
+    <color name="brand_on_container">#00201C</color>
+    <color name="banner_bg">#FFF1D6</color>
+    <color name="banner_fg">#4A3200</color>
+    <color name="card_stroke">#D3DEDB</color>
+    <color name="hint_fg">#1A2422</color>
+    <color name="zone_fill">#330B7A6E</color>
+    <color name="zone_stroke">#CC0B7A6E</color>
+</resources>

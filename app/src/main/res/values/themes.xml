@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Recuerdame" parent="Theme.Material3.DayNight">
+        <item name="colorPrimary">@color/brand</item>
+        <item name="colorOnPrimary">@color/brand_on</item>
+        <item name="colorPrimaryContainer">@color/brand_container</item>
+        <item name="colorOnPrimaryContainer">@color/brand_on_container</item>
+        <item name="colorSecondaryContainer">@color/brand_container</item>
+        <item name="colorOnSecondaryContainer">@color/brand_on_container</item>
+    </style>
+</resources>
