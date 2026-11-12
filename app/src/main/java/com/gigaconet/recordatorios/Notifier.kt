@@ -23,6 +23,27 @@ object Notifier {
         ctx.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
+    /** Aviso de ejemplo para escuchar cómo suena. */
+    @SuppressLint("MissingPermission")
+    fun showTest(ctx: Context) {
+        if (!GeofenceHelper.hasNotifications(ctx)) return
+        ensureChannel(ctx)
+        val title = "Estás cerca de Supermercado (ejemplo)"
+        val notification = NotificationCompat.Builder(ctx, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notif)
+            .setContentTitle(title)
+            .setContentText("Comprar pan y leche")
+            .setStyle(NotificationCompat.InboxStyle().setBigContentTitle(title).addLine("• Comprar pan y leche"))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(ctx).notify(TEST_ID, notification)
+    }
+
+    private const val TEST_ID = 4242
+
     fun notificationId(placeId: String, trigger: Trigger) = (placeId + trigger.name).hashCode()
 
     @SuppressLint("MissingPermission")

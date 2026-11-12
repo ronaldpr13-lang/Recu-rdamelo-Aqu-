@@ -79,7 +79,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:gravity="center"
-                    android:text="Marca un lugar en el mapa y escribe qué tienes que hacer ahí.&#10;&#10;Al llegar: «Comprar cable UTP» cuando pases por la ferretería.&#10;Al salir: «Llevar las llaves del local» cuando salgas de casa."
+                    android:text="Marca un lugar en el mapa y escribe qué tienes que hacer ahí.&#10;&#10;Al llegar: «Comprar pan y leche» cuando pases por el supermercado.&#10;Al salir: «No olvidar el cargador» cuando salgas de casa."
                     android:textSize="15sp" />
             </LinearLayout>
 
@@ -88,6 +88,43 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
+
+            <!-- Sonido de los avisos -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Avisos"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:alpha="0.75"
+                android:text="Suenan y vibran como un mensaje, y aparecen arriba en la pantalla. Si el teléfono está en silencio, solo vibran."
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/test_button"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Probar aviso" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/sound_button"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="Cambiar sonido" />
+            </LinearLayout>
 
             <!-- Consejo para Samsung -->
             <TextView

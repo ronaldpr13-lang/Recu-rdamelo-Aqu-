@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
@@ -67,6 +68,8 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, MapPickerActivity::class.java))
         }
         findViewById<MaterialButton>(R.id.battery_button).setOnClickListener { openAppSettings() }
+        findViewById<MaterialButton>(R.id.test_button).setOnClickListener { testNotification() }
+        findViewById<MaterialButton>(R.id.sound_button).setOnClickListener { openSoundSettings() }
 
         if (!GeofenceHelper.hasFine(this)) askForeground()
     }
@@ -150,6 +153,30 @@ class MainActivity : AppCompatActivity() {
         startActivity(
             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
         )
+    }
+
+    private fun testNotification() {
+        if (!GeofenceHelper.hasNotifications(this)) {
+            Toast.makeText(this, "Primero activa las notificaciones de la app", Toast.LENGTH_LONG).show()
+            openAppSettings()
+            return
+        }
+        Notifier.showTest(this)
+        Toast.makeText(this, "Así te llegará el aviso", Toast.LENGTH_SHORT).show()
+    }
+
+    /** Abre la pantalla de Android donde se escoge el sonido de estos avisos. */
+    private fun openSoundSettings() {
+        Notifier.ensureChannel(this)
+        val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            .putExtra(Settings.EXTRA_CHANNEL_ID, Notifier.CHANNEL_ID)
+        try {
+            startActivity(intent)
+            Toast.makeText(this, "Toca «Sonido» y escoge el que quieras", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            openAppSettings()
+        }
     }
 
     @SuppressLint("MissingPermission")
