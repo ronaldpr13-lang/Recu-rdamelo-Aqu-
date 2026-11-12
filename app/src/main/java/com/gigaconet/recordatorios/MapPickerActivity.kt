@@ -257,22 +257,36 @@ class MapPickerActivity : AppCompatActivity() {
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> { downY = e.rawY; true }
                 MotionEvent.ACTION_MOVE -> {
-                    sheet.translationY = (e.rawY - downY).coerceAtLeast(0f); true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    val dy = e.rawY - downY
-                    if (dy > 70 * dp) setFullMap(true)
-                    else sheet.animate().translationY(0f).setDuration(150).start()
-                    if (kotlin.math.abs(dy) < 8 * dp) v.performClick()
+                    if (!fullMap && e.rawY - downY > 40 * dp) setFullMap(true)
                     true
                 }
-                else -> false
+                MotionEvent.ACTION_UP -> {
+                    if (kotlin.math.abs(e.rawY - downY) < 8 * dp) v.performClick()
+                    true
+                }
+                else -> true
+            }
+        }
+
+        // Barrita del mapa completo: deslizar hacia arriba o tocar para volver
+        var peekDownY = 0f
+        findViewById<View>(R.id.peek).setOnTouchListener { v, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { peekDownY = e.rawY; true }
+                MotionEvent.ACTION_MOVE -> {
+                    if (fullMap && peekDownY - e.rawY > 30 * dp) setFullMap(false)
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (fullMap && kotlin.math.abs(e.rawY - peekDownY) < 8 * dp) { v.performClick(); setFullMap(false) }
+                    true
+                }
+                else -> true
             }
         }
 
         // Mapa a pantalla completa
         findViewById<MaterialButton>(R.id.fab_expand).setOnClickListener { setFullMap(!fullMap) }
-        findViewById<MaterialButton>(R.id.btn_confirm_point).setOnClickListener { setFullMap(false) }
         fullMapBack = object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() = setFullMap(false)
         }
@@ -283,36 +297,37 @@ class MapPickerActivity : AppCompatActivity() {
 
     /** Esconde el panel para ver todo el mapa; "Usar este punto" lo vuelve a mostrar. */
     private fun setFullMap(on: Boolean) {
+        if (fullMap == on) return
         fullMap = on
         fullMapBack.isEnabled = on
         getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(map.windowToken, 0)
         val sheet = findViewById<View>(R.id.sheet)
+        val peek = findViewById<View>(R.id.peek)
         val keep = center() // el mapa cambia de tamaño: mantener el mismo punto en el centro
-        if (on) {
-            sheet.animate().translationY(sheet.height.toFloat()).setDuration(200).withEndAction {
-                sheet.visibility = View.GONE
-                sheet.translationY = 0f
-                map.post { map.controller.setCenter(keep); onCenterMoved() }
-            }.start()
-        } else {
-            sheet.visibility = View.VISIBLE
-            sheet.translationY = sheet.height.toFloat()
-            sheet.animate().translationY(0f).setDuration(220).start()
-            map.post { map.controller.setCenter(keep); onCenterMoved() }
-        }
-        findViewById<View>(R.id.btn_confirm_point).visibility = if (on) View.VISIBLE else View.GONE
+
+        // Cambio inmediato: el mapa crece o se achica al momento, sin espacios en blanco
+        sheet.animate().cancel()
+        sheet.translationY = 0f
+        sheet.visibility = if (on) View.GONE else View.VISIBLE
+        peek.visibility = if (on) View.VISIBLE else View.GONE
+        findViewById<TextView>(R.id.peek_address).text = addressText.text
+        val fade = if (on) peek else sheet
+        fade.alpha = 0f
+        fade.animate().alpha(1f).setDuration(160).start()
+
         findViewById<MaterialButton>(R.id.fab_expand).apply {
             setIconResource(if (on) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen)
             contentDescription = if (on) "Volver al formulario" else "Ver mapa completo"
         }
         val dp = resources.displayMetrics.density
-        // Subir los botones redondos para que no choquen con "Usar este punto"
+        // Subir los botones redondos para que no choquen con la barrita
         listOf(R.id.fab_location to 40, R.id.fab_expand to 104).forEach { (id, base) ->
             val v = findViewById<View>(id)
             (v.layoutParams as android.widget.FrameLayout.LayoutParams).bottomMargin =
-                ((if (on) base + 64 else base) * dp).toInt()
+                ((if (on) base + 56 else base) * dp).toInt()
             v.requestLayout()
         }
+        map.post { map.controller.setCenter(keep); onCenterMoved() }
     }
 
     /** Punto azul con borde blanco para tu ubicación. */
@@ -449,6 +464,8 @@ class MapPickerActivity : AppCompatActivity() {
             if (ticket != geocodeTicket || isFinishing) return@reverse
             lastAddress = addr ?: ""
             addressText.text = addr ?: "Punto marcado en el mapa"
+            findViewById<TextView>(R.id.peek_address).text = addressText.text
+            if (addr != null && !searchInput.hasFocus()) searchInput.setText(addr)
         }
     }
 
