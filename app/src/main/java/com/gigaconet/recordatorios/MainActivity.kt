@@ -1,24 +1,28 @@
 package com.gigaconet.recordatorios
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
+import android.location.Location
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.CheckBox
-import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.PopupMenu
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationServices
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+import com.google.android.material.textfield.TextInputEditText
 
 class MainActivity : AppCompatActivity() {
 
@@ -28,10 +32,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bannerText: TextView
     private lateinit var bannerButton: MaterialButton
 
+    private var myLocation: Location? = null
+    private var lastPermsOk: Boolean? = null
+
     private val foregroundLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
         updateBanner()
+        refreshMyLocation()
         if (GeofenceHelper.hasFine(this) && !GeofenceHelper.hasBackground(this)) {
             explainBackground()
         }
@@ -67,6 +75,17 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         render()
         updateBanner()
+        refreshMyLocation()
+        // Vuelve a crear las zonas si cambiaron los permisos (o la primera vez)
+        val ok = GeofenceHelper.hasFine(this) && GeofenceHelper.hasBackground(this)
+        if (ok != lastPermsOk) {
+            lastPermsOk = ok
+            GeofenceHelper.syncAll(this)
+        }
+    }
+
+    private fun changed() {
+        render()
         GeofenceHelper.syncAll(this)
     }
 
@@ -84,10 +103,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun explainBackground() {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle("Un permiso más")
             .setMessage(
-                "Para avisarte con la app cerrada, en la siguiente pantalla elige " +
+                "Para avisarte al llegar o al salir con la app cerrada, en la siguiente pantalla elige " +
                     "\"Permitir todo el tiempo\" en Ubicación."
             )
             .setPositiveButton("Continuar") { _, _ ->
@@ -102,12 +121,12 @@ class MainActivity : AppCompatActivity() {
     private fun updateBanner() {
         when {
             !GeofenceHelper.hasFine(this) -> showBanner(
-                "La app necesita tu ubicación para avisarte al llegar a un lugar.",
+                "La app necesita tu ubicación para avisarte al llegar o salir de un lugar.",
                 "Permitir ubicación"
             ) { askForeground() }
 
             !GeofenceHelper.hasBackground(this) -> showBanner(
-                "Falta elegir \"Permitir todo el tiempo\" en Ubicación. Sin eso solo avisa con la app abierta.",
+                "Falta elegir \"Permitir todo el tiempo\" en Ubicación. Sin eso no te puede avisar con la app cerrada.",
                 "Abrir ajustes"
             ) { openAppSettings() }
 
@@ -133,78 +152,129 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    @SuppressLint("MissingPermission")
+    private fun refreshMyLocation() {
+        if (!GeofenceHelper.hasFine(this)) return
+        LocationServices.getFusedLocationProviderClient(this).lastLocation
+            .addOnSuccessListener { loc ->
+                if (loc != null && !isFinishing) {
+                    myLocation = loc
+                    render()
+                }
+            }
+    }
+
     // ---------- Lista de lugares ----------
+
+    private fun distanceTo(p: Place): Float? = myLocation?.let { p.distanceTo(it.latitude, it.longitude) }
 
     private fun render() {
         val places = Store.load(this)
         container.removeAllViews()
         emptyView.visibility = if (places.isEmpty()) View.VISIBLE else View.GONE
 
-        // Primero los lugares con cosas pendientes
-        places.sortedWith(compareBy({ it.pending.isEmpty() }, { it.name.lowercase() })).forEach { place ->
+        // Primero los que tienen pendientes; luego los más cercanos
+        val sorted = places.sortedWith(
+            compareBy<Place>({ it.pending.isEmpty() }, { distanceTo(it) ?: Float.MAX_VALUE }, { it.name.lowercase() })
+        )
+
+        sorted.forEach { place ->
             val card = LayoutInflater.from(this).inflate(R.layout.item_place, container, false)
             card.findViewById<TextView>(R.id.place_name).text = place.name
+
+            val addressView = card.findViewById<TextView>(R.id.place_address)
+            val showAddress = place.address.isNotBlank() && !place.address.startsWith(place.name)
+            addressView.visibility = if (showAddress) View.VISIBLE else View.GONE
+            addressView.text = place.address
+
             val pendingCount = place.pending.size
-            card.findViewById<TextView>(R.id.place_info).text = buildString {
-                append("Aviso a ${place.radius.toInt()} m · ")
-                append(
+            card.findViewById<TextView>(R.id.place_info).text = buildList {
+                distanceTo(place)?.let { add("Estás a ${Geo.distanceText(it)}") }
+                add("aviso a ${Geo.distanceText(place.radius)}")
+                add(
                     when (pendingCount) {
                         0 -> "todo listo"
                         1 -> "1 pendiente"
                         else -> "$pendingCount pendientes"
                     }
                 )
-            }
+            }.joinToString(" · ")
 
             val notesBox = card.findViewById<LinearLayout>(R.id.notes_container)
-            place.notes.forEach { note ->
-                val cb = CheckBox(this).apply {
-                    text = note.text
-                    isChecked = note.done
-                    alpha = if (note.done) 0.5f else 1f
-                    textSize = 16f
-                    setOnCheckedChangeListener { _, checked ->
-                        Store.update(this@MainActivity) { list ->
-                            list.find { it.id == place.id }?.notes?.find { it.id == note.id }?.done = checked
-                        }
-                        render()
-                        GeofenceHelper.syncAll(this@MainActivity)
-                    }
-                    setOnLongClickListener { confirmDeleteNote(place, note); true }
-                }
-                notesBox.addView(cb)
-            }
+            place.notes.sortedBy { it.done }.forEach { note -> notesBox.addView(noteRow(place, note)) }
 
             card.findViewById<MaterialButton>(R.id.btn_add_note).setOnClickListener { addNote(place) }
             card.findViewById<MaterialButton>(R.id.btn_clear_done).apply {
                 visibility = if (place.notes.any { it.done }) View.VISIBLE else View.GONE
                 setOnClickListener { clearDone(place) }
             }
-            card.findViewById<MaterialButton>(R.id.btn_delete_place).setOnClickListener { confirmDeletePlace(place) }
+            card.findViewById<MaterialButton>(R.id.btn_more).setOnClickListener { anchor -> showPlaceMenu(anchor, place) }
 
             container.addView(card)
         }
     }
 
-    private fun addNote(place: Place) {
-        val input = EditText(this).apply {
-            hint = "Ej: comprar cable UTP"
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-        }
-        val pad = (20 * resources.displayMetrics.density).toInt()
-        val wrap = FrameLayout(this).apply { setPadding(pad, pad / 2, pad, 0); addView(input) }
+    private fun noteRow(place: Place, note: Note): View {
+        val row = LayoutInflater.from(this).inflate(R.layout.item_note, container, false)
+        val cb = row.findViewById<CheckBox>(R.id.note_check)
+        val tag = row.findViewById<TextView>(R.id.note_tag)
 
-        AlertDialog.Builder(this)
+        cb.text = note.text
+        cb.isChecked = note.done
+        row.alpha = if (note.done) 0.5f else 1f
+        cb.setOnCheckedChangeListener { _, checked ->
+            Store.update(this) { list ->
+                list.find { it.id == place.id }?.notes?.find { it.id == note.id }?.done = checked
+            }
+            changed()
+        }
+        cb.setOnLongClickListener { confirmDeleteNote(place, note); true }
+
+        val leave = note.trigger == Trigger.LEAVE
+        tag.text = if (leave) "Al salir" else "Al llegar"
+        tag.setBackgroundResource(if (leave) R.drawable.bg_tag_leave else R.drawable.bg_tag_arrive)
+        tag.setTextColor(ContextCompat.getColor(this, if (leave) R.color.tag_leave_fg else R.color.tag_arrive_fg))
+        return row
+    }
+
+    private fun showPlaceMenu(anchor: View, place: Place) {
+        PopupMenu(this, anchor).apply {
+            menu.add(0, 1, 0, "Editar lugar y distancia")
+            menu.add(0, 2, 1, "Borrar lugar")
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> startActivity(
+                        Intent(this@MainActivity, MapPickerActivity::class.java)
+                            .putExtra(MapPickerActivity.EXTRA_PLACE_ID, place.id)
+                    )
+                    2 -> confirmDeletePlace(place)
+                }
+                true
+            }
+            show()
+        }
+    }
+
+    private fun addNote(place: Place) {
+        val view = LayoutInflater.from(this).inflate(R.layout.dialog_note, null)
+        val input = view.findViewById<TextInputEditText>(R.id.dialog_note_input)
+        val group = view.findViewById<MaterialButtonToggleGroup>(R.id.dialog_trigger_group)
+        // Si el lugar ya tiene notas "al salir" (ej: la casa), sugerir esa opción
+        if (place.notes.isNotEmpty() && place.notes.all { it.trigger == Trigger.LEAVE }) {
+            group.check(R.id.dlg_leave)
+        }
+
+        MaterialAlertDialogBuilder(this)
             .setTitle("Nueva nota en ${place.name}")
-            .setView(wrap)
+            .setView(view)
             .setPositiveButton("Guardar") { _, _ ->
-                val text = input.text.toString().trim()
+                val text = input.text?.toString()?.trim().orEmpty()
                 if (text.isNotEmpty()) {
+                    val trigger = if (group.checkedButtonId == R.id.dlg_leave) Trigger.LEAVE else Trigger.ARRIVE
                     Store.update(this) { list ->
-                        list.find { it.id == place.id }?.notes?.add(Note(text = text))
+                        list.find { it.id == place.id }?.notes?.add(Note(text = text, trigger = trigger))
                     }
-                    render()
-                    GeofenceHelper.syncAll(this)
+                    changed()
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -220,28 +290,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun confirmDeleteNote(place: Place, note: Note) {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle("¿Borrar esta nota?")
             .setMessage(note.text)
             .setPositiveButton("Borrar") { _, _ ->
                 Store.update(this) { list ->
                     list.find { it.id == place.id }?.notes?.removeAll { it.id == note.id }
                 }
-                render()
-                GeofenceHelper.syncAll(this)
+                changed()
             }
             .setNegativeButton("Cancelar", null)
             .show()
     }
 
     private fun confirmDeletePlace(place: Place) {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle("¿Borrar ${place.name}?")
             .setMessage("Se borran el lugar y sus ${place.notes.size} notas. No se puede deshacer.")
             .setPositiveButton("Borrar") { _, _ ->
                 Store.update(this) { list -> list.removeAll { it.id == place.id } }
-                render()
-                GeofenceHelper.syncAll(this)
+                changed()
             }
             .setNegativeButton("Cancelar", null)
             .show()

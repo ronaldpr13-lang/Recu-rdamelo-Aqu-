@@ -15,7 +15,8 @@ import com.google.android.gms.location.LocationServices
 
 /**
  * Registra en Android una "geovalla" (círculo) por cada lugar con notas pendientes.
- * Android vigila esas zonas aunque la app esté cerrada y avisa a GeofenceReceiver.
+ * Android vigila esas zonas aunque la app esté cerrada y avisa a GeofenceReceiver
+ * al entrar (notas "al llegar") o al salir (notas "al salir").
  */
 object GeofenceHelper {
     private const val TAG = "Geovallas"
@@ -54,18 +55,22 @@ object GeofenceHelper {
             if (!hasFine(ctx) || !hasBackground(ctx)) {
                 onDone?.invoke(); return@addOnCompleteListener
             }
-            val places = Store.load(ctx).filter { it.pending.isNotEmpty() }.take(MAX_FENCES)
-            if (places.isEmpty()) {
-                onDone?.invoke(); return@addOnCompleteListener
-            }
-            val fences = places.map { p ->
-                Geofence.Builder()
+            val fences = Store.load(ctx).mapNotNull { p ->
+                var transitions = 0
+                if (p.pendingFor(Trigger.ARRIVE).isNotEmpty()) transitions = transitions or Geofence.GEOFENCE_TRANSITION_ENTER
+                if (p.pendingFor(Trigger.LEAVE).isNotEmpty()) transitions = transitions or Geofence.GEOFENCE_TRANSITION_EXIT
+                if (transitions == 0) null
+                else Geofence.Builder()
                     .setRequestId(p.id)
                     .setCircularRegion(p.lat, p.lng, p.radius)
                     .setExpirationDuration(Geofence.NEVER_EXPIRE)
-                    .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
+                    .setTransitionTypes(transitions)
                     .setNotificationResponsiveness(30_000)
                     .build()
+            }.take(MAX_FENCES)
+
+            if (fences.isEmpty()) {
+                onDone?.invoke(); return@addOnCompleteListener
             }
             // Sin aviso inicial: si creas el lugar estando ahí, no te avisa al instante.
             val request = GeofencingRequest.Builder()

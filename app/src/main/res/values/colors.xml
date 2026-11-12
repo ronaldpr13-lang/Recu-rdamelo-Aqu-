@@ -10,4 +10,10 @@
     <color name="hint_fg">#1A2422</color>
     <color name="zone_fill">#330B7A6E</color>
     <color name="zone_stroke">#CC0B7A6E</color>
+    <color name="other_fill">#1A5B6B8C</color>
+    <color name="other_stroke">#995B6B8C</color>
+    <color name="tag_arrive_bg">#D6F2EC</color>
+    <color name="tag_arrive_fg">#0B5A51</color>
+    <color name="tag_leave_bg">#FCE3D8</color>
+    <color name="tag_leave_fg">#8A2E0E</color>
 </resources>

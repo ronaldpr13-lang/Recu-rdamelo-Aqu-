@@ -79,7 +79,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:gravity="center"
-                    android:text="Agrega la ferretería, el colmado o la farmacia y escribe lo que tienes que comprar. Te avisamos cuando pases cerca."
+                    android:text="Marca un lugar en el mapa y escribe qué tienes que hacer ahí.&#10;&#10;Al llegar: «Comprar cable UTP» cuando pases por la ferretería.&#10;Al salir: «Llevar las llaves del local» cuando salgas de casa."
                     android:textSize="15sp" />
             </LinearLayout>
 
@@ -113,6 +113,6 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="20dp"
-        android:text="Agregar lugar"
+        android:text="Nuevo recordatorio"
         app:icon="@drawable/ic_add" />
 </FrameLayout>

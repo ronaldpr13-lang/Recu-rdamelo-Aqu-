@@ -8,4 +8,8 @@
     <color name="banner_fg">#FFE7B5</color>
     <color name="card_stroke">#3A4644</color>
     <color name="hint_fg">#1A2422</color>
+    <color name="tag_arrive_bg">#123F39</color>
+    <color name="tag_arrive_fg">#9FE6D9</color>
+    <color name="tag_leave_bg">#4A2416</color>
+    <color name="tag_leave_fg">#FFC2AA</color>
 </resources>
