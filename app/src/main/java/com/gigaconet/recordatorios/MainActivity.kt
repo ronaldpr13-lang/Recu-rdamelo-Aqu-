@@ -23,6 +23,9 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.textfield.TextInputEditText
 
 class MainActivity : AppCompatActivity() {
@@ -41,6 +44,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         updateBanner()
         refreshMyLocation()
+        TrackerService.refresh(this)
         if (GeofenceHelper.hasFine(this) && !GeofenceHelper.hasBackground(this)) {
             explainBackground()
         }
@@ -70,6 +74,10 @@ class MainActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.battery_button).setOnClickListener { openAppSettings() }
         findViewById<MaterialButton>(R.id.test_button).setOnClickListener { testNotification() }
         findViewById<MaterialButton>(R.id.sound_button).setOnClickListener { openSoundSettings() }
+        findViewById<MaterialSwitch>(R.id.instant_switch).apply {
+            isChecked = TrackerService.isEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> TrackerService.setEnabled(this@MainActivity, on) }
+        }
 
         if (!GeofenceHelper.hasFine(this)) askForeground()
     }
@@ -85,11 +93,13 @@ class MainActivity : AppCompatActivity() {
             lastPermsOk = ok
             GeofenceHelper.syncAll(this)
         }
+        TrackerService.refresh(this)
     }
 
     private fun changed() {
         render()
         GeofenceHelper.syncAll(this)
+        TrackerService.refresh(this)
     }
 
     // ---------- Permisos ----------
@@ -182,7 +192,17 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("MissingPermission")
     private fun refreshMyLocation() {
         if (!GeofenceHelper.hasFine(this)) return
-        LocationServices.getFusedLocationProviderClient(this).lastLocation
+        val client = LocationServices.getFusedLocationProviderClient(this)
+        // Primero la última conocida si es reciente, luego una lectura fresca del GPS
+        client.lastLocation.addOnSuccessListener { loc ->
+            if (loc != null && !isFinishing && myLocation == null &&
+                System.currentTimeMillis() - loc.time < 2 * 60_000
+            ) {
+                myLocation = loc
+                render()
+            }
+        }
+        client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
             .addOnSuccessListener { loc ->
                 if (loc != null && !isFinishing) {
                     myLocation = loc
@@ -216,7 +236,10 @@ class MainActivity : AppCompatActivity() {
 
             val pendingCount = place.pending.size
             card.findViewById<TextView>(R.id.place_info).text = buildList {
-                distanceTo(place)?.let { add("Estás a ${Geo.distanceText(it)}") }
+                distanceTo(place)?.let { d ->
+                    val acc = myLocation?.accuracy ?: 0f
+                    add("Estás a ${Geo.distanceText(d)}" + if (acc > 20) " (GPS ±${acc.toInt()} m)" else "")
+                }
                 add("aviso a ${Geo.distanceText(place.radius)}")
                 add(
                     when (pendingCount) {

@@ -52,6 +52,12 @@ object Notifier {
         ensureChannel(ctx)
         val id = notificationId(place.id, trigger)
 
+        // El GPS rápido y Android pueden detectar lo mismo: no sonar dos veces
+        val prefs = ctx.getSharedPreferences("ultimos_avisos", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        if (now - prefs.getLong(id.toString(), 0) < 3 * 60_000) return
+        prefs.edit().putLong(id.toString(), now).apply()
+
         val openIntent = Intent(ctx, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val open = PendingIntent.getActivity(

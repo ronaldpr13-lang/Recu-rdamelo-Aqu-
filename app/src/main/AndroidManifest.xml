@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
         android:allowBackup="true"
@@ -33,6 +35,11 @@
             android:exported="false"
             android:label="@string/nuevo_lugar"
             android:windowSoftInputMode="adjustResize" />
+
+        <service
+            android:name=".TrackerService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <receiver
             android:name=".GeofenceReceiver"

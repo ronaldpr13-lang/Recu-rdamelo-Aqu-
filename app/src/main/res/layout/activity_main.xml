@@ -105,9 +105,25 @@
                 android:text="Suenan y vibran como un mensaje, y aparecen arriba en la pantalla. Si el teléfono está en silencio, solo vibran."
                 android:textSize="13sp" />
 
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/instant_switch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Aviso al instante"
+                android:textSize="16sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:alpha="0.75"
+                android:text="Revisa tu GPS cada pocos segundos cuando estás cerca de un lugar y cada minuto cuando estás lejos. Deja un aviso fijo en la barra. Si lo apagas, Android avisa solo, pero puede tardar varios minutos."
+                android:textSize="13sp" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton

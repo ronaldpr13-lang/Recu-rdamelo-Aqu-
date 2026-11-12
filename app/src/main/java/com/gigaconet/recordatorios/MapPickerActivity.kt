@@ -35,6 +35,8 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import kotlin.math.roundToInt
 
 /**
@@ -45,9 +47,9 @@ class MapPickerActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_PLACE_ID = "place_id"
-        private const val MIN_RADIUS = 100f
+        private const val MIN_RADIUS = 30f
         private const val MAX_RADIUS = 2000f
-        private const val STEP = 50f
+        private const val STEP = 10f
     }
 
     private lateinit var map: MapView
@@ -60,6 +62,8 @@ class MapPickerActivity : AppCompatActivity() {
     private lateinit var searchInput: TextInputEditText
     private lateinit var triggerGroup: MaterialButtonToggleGroup
     private lateinit var circle: Polygon
+    private lateinit var gpsText: TextView
+    private var myDot: MyLocationNewOverlay? = null
 
     private var editing: Place? = null
     private var radius = 200f
@@ -92,6 +96,7 @@ class MapPickerActivity : AppCompatActivity() {
         noteLayout = findViewById(R.id.note_layout)
         searchInput = findViewById(R.id.search_input)
         triggerGroup = findViewById(R.id.trigger_group)
+        gpsText = findViewById(R.id.gps_text)
 
         setupMap(all)
         setupControls()
@@ -151,6 +156,11 @@ class MapPickerActivity : AppCompatActivity() {
         }
         map.overlays.add(circle)
 
+        // Punto azul: dónde estás tú ahora mismo
+        if (GeofenceHelper.hasFine(this)) {
+            myDot = MyLocationNewOverlay(GpsMyLocationProvider(this), map).also { map.overlays.add(it) }
+        }
+
         // Tocar el mapa lleva el pin a ese punto
         map.overlays.add(0, MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
@@ -200,8 +210,8 @@ class MapPickerActivity : AppCompatActivity() {
         finish(); return true
     }
 
-    override fun onResume() { super.onResume(); map.onResume() }
-    override fun onPause() { super.onPause(); map.onPause() }
+    override fun onResume() { super.onResume(); map.onResume(); myDot?.enableMyLocation() }
+    override fun onPause() { myDot?.disableMyLocation(); super.onPause(); map.onPause() }
     override fun onDestroy() { handler.removeCallbacksAndMessages(null); super.onDestroy() }
 
     // ---------- Mapa ----------
@@ -231,6 +241,7 @@ class MapPickerActivity : AppCompatActivity() {
 
     private fun showRadius() {
         val how = when {
+            radius <= 60 -> "justo en el lugar"
             radius <= 150 -> "casi en la puerta"
             radius <= 300 -> "una o dos cuadras antes"
             radius <= 700 -> "bastante antes, bueno en motor o carro"
@@ -253,13 +264,22 @@ class MapPickerActivity : AppCompatActivity() {
             return
         }
         if (!quiet) userMovedMap = false
+        gpsText.visibility = View.VISIBLE
+        gpsText.text = "Buscando tu ubicación exacta…"
         val client = LocationServices.getFusedLocationProviderClient(this)
-        // Primero la última posición conocida (rápido), luego la exacta
+        // La última posición solo si es de hace menos de 1 minuto; luego la exacta del GPS
         client.lastLocation.addOnSuccessListener { loc ->
-            if (loc != null && !userMovedMap) goTo(loc.latitude, loc.longitude, animate = false)
+            if (loc != null && !userMovedMap && System.currentTimeMillis() - loc.time < 60_000) {
+                goTo(loc.latitude, loc.longitude, animate = false)
+            }
         }
         client.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
             .addOnSuccessListener { loc ->
+                if (loc != null) {
+                    val acc = loc.accuracy.toInt()
+                    gpsText.text = if (acc <= 20) "GPS preciso: ±$acc m"
+                    else "GPS poco preciso: ±$acc m. Sal al aire libre o espera unos segundos y toca otra vez el botón de ubicación."
+                }
                 when {
                     loc != null && !userMovedMap -> goTo(loc.latitude, loc.longitude, animate = true)
                     loc == null && !quiet -> Toast.makeText(
@@ -324,6 +344,7 @@ class MapPickerActivity : AppCompatActivity() {
                 }
             }
             GeofenceHelper.syncAll(this)
+            TrackerService.refresh(this)
             Toast.makeText(this, "Lugar actualizado", Toast.LENGTH_SHORT).show()
             finish()
             return
@@ -362,8 +383,10 @@ class MapPickerActivity : AppCompatActivity() {
             }
         }
         GeofenceHelper.syncAll(this)
-        val cuando = if (trigger == Trigger.LEAVE) "al salir de" else "al llegar a"
-        Toast.makeText(this, "Te aviso $cuando $savedIn", Toast.LENGTH_SHORT).show()
+        TrackerService.refresh(this)
+        val msg = if (trigger == Trigger.LEAVE) "Listo. Te aviso cuando salgas de $savedIn"
+        else "Listo. Te aviso la próxima vez que llegues a $savedIn"
+        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
         finish()
     }
 }

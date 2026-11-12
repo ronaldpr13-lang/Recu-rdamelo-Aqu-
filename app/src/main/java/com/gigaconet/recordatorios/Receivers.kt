@@ -49,6 +49,7 @@ class ActionReceiver : BroadcastReceiver() {
             list.find { it.id == placeId }?.notes?.filter { it.trigger == trigger }?.forEach { it.done = true }
         }
         NotificationManagerCompat.from(context).cancel(Notifier.notificationId(placeId, trigger))
+        TrackerService.refresh(context)
         val result = goAsync()
         GeofenceHelper.syncAll(context) { result.finish() }
     }
@@ -60,6 +61,7 @@ class BootReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
             intent.action == Intent.ACTION_MY_PACKAGE_REPLACED
         ) {
+            TrackerService.refresh(context)
             val result = goAsync()
             GeofenceHelper.syncAll(context) { result.finish() }
         }
