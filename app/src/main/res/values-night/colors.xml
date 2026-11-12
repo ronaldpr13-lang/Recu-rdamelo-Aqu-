@@ -1,15 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand">#7FD8CA</color>
-    <color name="brand_on">#003731</color>
-    <color name="brand_container">#005047</color>
-    <color name="brand_on_container">#B8EEE4</color>
-    <color name="banner_bg">#4A3A12</color>
-    <color name="banner_fg">#FFE7B5</color>
-    <color name="card_stroke">#3A4644</color>
-    <color name="hint_fg">#1A2422</color>
-    <color name="tag_arrive_bg">#123F39</color>
-    <color name="tag_arrive_fg">#9FE6D9</color>
-    <color name="tag_leave_bg">#4A2416</color>
-    <color name="tag_leave_fg">#FFC2AA</color>
+    <!-- Paleta oscura: grafito verdoso, acentos menta suaves -->
+    <color name="bg">#111614</color>
+    <color name="surface">#1A201E</color>
+    <color name="surface_soft">#242B28</color>
+    <color name="text">#E3E9E6</color>
+    <color name="text_soft">#9AA6A1</color>
+    <color name="outline">#3B4642</color>
+    <color name="divider">#2A3330</color>
+    <color name="primary">#8FCDBB</color>
+    <color name="on_primary">#0D3A2F</color>
+    <color name="primary_soft">#21372F</color>
+    <color name="on_primary_soft">#BDE5D9</color>
+    <color name="leave_soft">#3A2720</color>
+    <color name="leave_text">#F0B7A0</color>
+    <color name="ok">#8FCDBB</color>
+    <color name="warn">#E9AC77</color>
+    <color name="banner_bg">#352D19</color>
+    <color name="banner_fg">#F1DCA9</color>
+    <color name="pin">#8FCDBB</color>
+    <color name="zone_fill">#338FCDBB</color>
+    <color name="zone_stroke">#CC8FCDBB</color>
+    <color name="other_fill">#1A9AA6A1</color>
+    <color name="other_stroke">#809AA6A1</color>
 </resources>

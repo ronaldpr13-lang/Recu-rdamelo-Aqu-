@@ -15,11 +15,11 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.button.MaterialButtonToggleGroup
+import android.content.res.Configuration as UiConfig
+import android.widget.EditText
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.slider.Slider
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -35,6 +35,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
+import org.osmdroid.views.overlay.TilesOverlay
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import kotlin.math.roundToInt
@@ -59,8 +60,11 @@ class MapPickerActivity : AppCompatActivity() {
     private lateinit var nameInput: TextInputEditText
     private lateinit var noteInput: TextInputEditText
     private lateinit var noteLayout: TextInputLayout
-    private lateinit var searchInput: TextInputEditText
-    private lateinit var triggerGroup: MaterialButtonToggleGroup
+    private lateinit var searchInput: EditText
+    private lateinit var triggerGroup: ChipGroup
+    private lateinit var nameChips: ChipGroup
+    private lateinit var nameLayout: TextInputLayout
+    private lateinit var radiusValue: TextView
     private lateinit var circle: Polygon
     private lateinit var gpsText: TextView
     private var myDot: MyLocationNewOverlay? = null
@@ -80,12 +84,12 @@ class MapPickerActivity : AppCompatActivity() {
         Configuration.getInstance().userAgentValue = packageName
 
         setContentView(R.layout.activity_map)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        findViewById<MaterialButton>(R.id.btn_back).setOnClickListener { finish() }
 
         val all = Store.load(this)
         editing = intent.getStringExtra(EXTRA_PLACE_ID)?.let { id -> all.find { it.id == id } }
         val ed = editing
-        title = if (ed != null) "Editar lugar" else "Nuevo recordatorio"
+        findViewById<TextView>(R.id.sheet_title).text = if (ed != null) "Editar lugar" else "Nuevo recordatorio"
 
         map = findViewById(R.id.map)
         addressText = findViewById(R.id.address_text)
@@ -97,13 +101,16 @@ class MapPickerActivity : AppCompatActivity() {
         searchInput = findViewById(R.id.search_input)
         triggerGroup = findViewById(R.id.trigger_group)
         gpsText = findViewById(R.id.gps_text)
+        nameChips = findViewById(R.id.name_chips)
+        nameLayout = findViewById(R.id.name_layout)
+        radiusValue = findViewById(R.id.radius_value)
 
         setupMap(all)
         setupControls()
 
         if (ed != null) {
             findViewById<View>(R.id.new_note_section).visibility = View.GONE
-            nameInput.setText(ed.name)
+            selectName(ed.name)
             lastAddress = ed.address
             addressText.text = ed.address.ifBlank { ed.name }
             setRadius(ed.radius)
@@ -111,7 +118,7 @@ class MapPickerActivity : AppCompatActivity() {
             map.controller.setCenter(GeoPoint(ed.lat, ed.lng))
             findViewById<MaterialButton>(R.id.btn_save).text = "Guardar cambios"
         } else {
-            setRadius(200f)
+            setRadius(AppPrefs.defaultRadius(this))
             map.controller.setZoom(8.5)
             map.controller.setCenter(GeoPoint(18.75, -70.2)) // República Dominicana
             centerOnUser(quiet = true)
@@ -127,6 +134,11 @@ class MapPickerActivity : AppCompatActivity() {
         map.minZoomLevel = 5.0
         map.maxZoomLevel = 19.5
         map.zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
+        // Modo noche: mapa oscuro
+        val night = (resources.configuration.uiMode and UiConfig.UI_MODE_NIGHT_MASK) == UiConfig.UI_MODE_NIGHT_YES
+        if (night) map.overlayManager.tilesOverlay.setColorFilter(TilesOverlay.INVERT_COLORS)
+        map.overlayManager.tilesOverlay.loadingBackgroundColor = ContextCompat.getColor(this, R.color.bg)
+        map.overlayManager.tilesOverlay.loadingLineColor = ContextCompat.getColor(this, R.color.divider)
 
         // Tus otros lugares, para que los veas mientras escoges
         all.filter { it.id != editing?.id }.forEach { p ->
@@ -185,29 +197,42 @@ class MapPickerActivity : AppCompatActivity() {
             drawCircle()
         }
 
-        findViewById<FloatingActionButton>(R.id.fab_location).setOnClickListener {
+        findViewById<MaterialButton>(R.id.fab_location).setOnClickListener {
             centerOnUser(quiet = false)
         }
 
-        val chips = findViewById<ChipGroup>(R.id.name_chips)
-        for (i in 0 until chips.childCount) {
-            val chip = chips.getChildAt(i) as? Chip ?: continue
-            chip.setOnClickListener {
-                nameInput.setText(chip.text)
-                nameInput.setSelection(chip.text.length)
-            }
+        // Nombre: un toque en un atajo; "Otro…" abre el campo para escribir
+        nameChips.setOnCheckedStateChangeListener { _, ids ->
+            val other = ids.firstOrNull() == R.id.chip_other
+            nameLayout.visibility = if (other) View.VISIBLE else View.GONE
+            if (other) nameInput.requestFocus()
         }
 
         searchInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) { doSearch(); true } else false
         }
-        findViewById<TextInputLayout>(R.id.search_layout).setEndIconOnClickListener { doSearch() }
+        findViewById<MaterialButton>(R.id.btn_search).setOnClickListener { doSearch() }
 
         findViewById<MaterialButton>(R.id.btn_save).setOnClickListener { save() }
     }
 
-    override fun onSupportNavigateUp(): Boolean {
-        finish(); return true
+    /** Marca el atajo si el nombre coincide; si no, "Otro…" con el nombre escrito. */
+    private fun selectName(name: String) {
+        for (i in 0 until nameChips.childCount) {
+            val chip = nameChips.getChildAt(i) as? Chip ?: continue
+            if (chip.id != R.id.chip_other && chip.text.toString().equals(name, ignoreCase = true)) {
+                nameChips.check(chip.id); return
+            }
+        }
+        nameInput.setText(name)
+        nameChips.check(R.id.chip_other)
+    }
+
+    private fun chosenName(): String {
+        val id = nameChips.checkedChipId
+        if (id == View.NO_ID) return ""
+        if (id == R.id.chip_other) return nameInput.text?.toString()?.trim().orEmpty()
+        return findViewById<Chip>(id).text.toString()
     }
 
     override fun onResume() { super.onResume(); map.onResume(); myDot?.enableMyLocation() }
@@ -247,7 +272,8 @@ class MapPickerActivity : AppCompatActivity() {
             radius <= 700 -> "bastante antes, bueno en motor o carro"
             else -> "desde lejos"
         }
-        radiusLabel.text = "Avisarme a ${Geo.distanceText(radius)} ($how)"
+        radiusValue.text = Geo.distanceText(radius)
+        radiusLabel.text = "Te aviso $how"
     }
 
     private fun goTo(lat: Double, lng: Double, animate: Boolean) {
@@ -330,7 +356,7 @@ class MapPickerActivity : AppCompatActivity() {
 
     private fun save() {
         val c = center()
-        val typedName = nameInput.text?.toString()?.trim().orEmpty()
+        val typedName = chosenName()
         val ed = editing
 
         if (ed != null) {
@@ -357,7 +383,7 @@ class MapPickerActivity : AppCompatActivity() {
             return
         }
         noteLayout.error = null
-        val trigger = if (triggerGroup.checkedButtonId == R.id.btn_leave) Trigger.LEAVE else Trigger.ARRIVE
+        val trigger = if (triggerGroup.checkedChipId == R.id.chip_leave) Trigger.LEAVE else Trigger.ARRIVE
 
         var savedIn = ""
         Store.update(this) { list ->

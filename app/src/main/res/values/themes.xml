@@ -1,11 +1,122 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="Theme.Recuerdame" parent="Theme.Material3.DayNight">
-        <item name="colorPrimary">@color/brand</item>
-        <item name="colorOnPrimary">@color/brand_on</item>
-        <item name="colorPrimaryContainer">@color/brand_container</item>
-        <item name="colorOnPrimaryContainer">@color/brand_on_container</item>
-        <item name="colorSecondaryContainer">@color/brand_container</item>
-        <item name="colorOnSecondaryContainer">@color/brand_on_container</item>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Recuerdame" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorPrimaryContainer">@color/primary_soft</item>
+        <item name="colorOnPrimaryContainer">@color/on_primary_soft</item>
+        <item name="colorSecondary">@color/primary</item>
+        <item name="colorOnSecondary">@color/on_primary</item>
+        <item name="colorSecondaryContainer">@color/primary_soft</item>
+        <item name="colorOnSecondaryContainer">@color/on_primary_soft</item>
+        <item name="colorTertiaryContainer">@color/leave_soft</item>
+        <item name="colorOnTertiaryContainer">@color/leave_text</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text</item>
+        <item name="colorSurfaceVariant">@color/surface_soft</item>
+        <item name="colorOnSurfaceVariant">@color/text_soft</item>
+        <item name="colorSurfaceContainerLowest">@color/surface</item>
+        <item name="colorSurfaceContainerLow">@color/surface</item>
+        <item name="colorSurfaceContainer">@color/surface</item>
+        <item name="colorSurfaceContainerHigh">@color/surface</item>
+        <item name="colorSurfaceContainerHighest">@color/surface_soft</item>
+        <item name="colorOutline">@color/outline</item>
+        <item name="colorOutlineVariant">@color/divider</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:windowLightStatusBar">@bool/light_bars</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">@bool/light_bars</item>
+    </style>
+
+    <!-- Fila de ajustes tocable -->
+    <style name="SettingsRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">60dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">18dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingTop">10dp</item>
+        <item name="android:paddingBottom">10dp</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="SettingsTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="SettingsDesc">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/text_soft</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:layout_marginTop">2dp</item>
+    </style>
+
+    <style name="SectionLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">6dp</item>
+        <item name="android:layout_marginTop">24dp</item>
+        <item name="android:layout_marginBottom">8dp</item>
+        <item name="android:textColor">@color/primary</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:letterSpacing">0.04</item>
+    </style>
+
+    <style name="SoftCard" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">@color/surface</item>
+        <item name="cardCornerRadius">20dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeWidth">0dp</item>
+    </style>
+
+    <style name="SoftInput" parent="Widget.Material3.TextInputLayout.FilledBox">
+        <item name="boxBackgroundColor">@color/surface_soft</item>
+        <item name="boxStrokeWidth">0dp</item>
+        <item name="boxStrokeWidthFocused">0dp</item>
+        <item name="boxCornerRadiusTopStart">16dp</item>
+        <item name="boxCornerRadiusTopEnd">16dp</item>
+        <item name="boxCornerRadiusBottomStart">16dp</item>
+        <item name="boxCornerRadiusBottomEnd">16dp</item>
+        <item name="hintTextColor">@color/primary</item>
+    </style>
+
+    <style name="SoftChip" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/chip_bg</item>
+        <item name="chipStrokeWidth">0dp</item>
+        <item name="android:textColor">@color/chip_text</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="chipIconTint">@color/chip_text</item>
+        <item name="chipMinHeight">40dp</item>
+        <item name="chipCornerRadius">20dp</item>
+    </style>
+
+    <style name="SoftSlider" parent="Widget.Material3.Slider">
+        <item name="trackColorActive">@color/primary</item>
+        <item name="trackColorInactive">@color/primary_soft</item>
+        <item name="thumbColor">@color/primary</item>
+        <item name="tickVisible">false</item>
+        <item name="labelBehavior">gone</item>
+    </style>
+
+    <style name="PillButton" parent="Widget.Material3.Button">
+        <item name="android:minHeight">56dp</item>
+        <item name="cornerRadius">28dp</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="MapRoundButton" parent="Widget.Material3.Button.IconButton.Filled">
+        <item name="backgroundTint">@color/surface</item>
+        <item name="iconTint">@color/text</item>
+        <item name="android:elevation">3dp</item>
     </style>
 </resources>

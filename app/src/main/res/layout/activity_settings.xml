@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="32dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_back"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:contentDescription="Volver"
+                app:icon="@drawable/ic_back"
+                app:iconTint="@color/text" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="Configuración"
+                android:textColor="@color/text"
+                android:textSize="24sp" />
+        </LinearLayout>
+
+        <!-- Apariencia -->
+        <TextView style="@style/SectionLabel" android:text="APARIENCIA" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SoftCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView style="@style/SettingsTitle" android:text="Tema" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/theme_group"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/theme_system"
+                        style="@style/SoftChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Automático" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/theme_light"
+                        style="@style/SoftChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Día" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/theme_dark"
+                        style="@style/SoftChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Noche" />
+                </com.google.android.material.chip.ChipGroup>
+
+                <TextView
+                    style="@style/SettingsDesc"
+                    android:layout_marginTop="6dp"
+                    android:text="Automático sigue el modo del teléfono." />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Avisos -->
+        <TextView style="@style/SectionLabel" android:text="AVISOS" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SoftCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/row_instant"
+                    style="@style/SettingsRow">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView style="@style/SettingsTitle" android:text="Aviso al instante" />
+
+                        <TextView
+                            style="@style/SettingsDesc"
+                            android:text="Revisa el GPS cada pocos segundos cerca de tus lugares. Deja un ícono fijo en la barra." />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/instant_switch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="18dp"
+                    android:background="@color/divider" />
+
+                <LinearLayout
+                    android:id="@+id/row_sound"
+                    style="@style/SettingsRow">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView style="@style/SettingsTitle" android:text="Sonido del aviso" />
+
+                        <TextView
+                            android:id="@+id/sound_value"
+                            style="@style/SettingsDesc" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_chevron"
+                        app:tint="@color/text_soft" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="18dp"
+                    android:background="@color/divider" />
+
+                <LinearLayout
+                    android:id="@+id/row_test"
+                    style="@style/SettingsRow">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView style="@style/SettingsTitle" android:text="Probar aviso" />
+
+                        <TextView
+                            style="@style/SettingsDesc"
+                            android:text="Muestra un aviso de ejemplo con el sonido elegido." />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_chevron"
+                        app:tint="@color/text_soft" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="18dp"
+                    android:background="@color/divider" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingStart="18dp"
+                    android:paddingTop="14dp"
+                    android:paddingEnd="18dp"
+                    android:paddingBottom="8dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            style="@style/SettingsTitle"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:text="Distancia para lugares nuevos" />
+
+                        <TextView
+                            android:id="@+id/radius_value"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
+                            android:textColor="@color/primary"
+                            android:textSize="15sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.slider.Slider
+                        android:id="@+id/radius_slider"
+                        style="@style/SoftSlider"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="Distancia para lugares nuevos"
+                        android:stepSize="10"
+                        android:value="150"
+                        android:valueFrom="30"
+                        android:valueTo="1000" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Permisos -->
+        <TextView style="@style/SectionLabel" android:text="PARA QUE LOS AVISOS LLEGUEN" />
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SoftCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:id="@+id/row_perm_location"
+                    style="@style/SettingsRow">
+
+                    <TextView
+                        style="@style/SettingsTitle"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:text="Ubicación todo el tiempo" />
+
+                    <TextView
+                        android:id="@+id/perm_location"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="18dp"
+                    android:background="@color/divider" />
+
+                <LinearLayout
+                    android:id="@+id/row_perm_notif"
+                    style="@style/SettingsRow">
+
+                    <TextView
+                        style="@style/SettingsTitle"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:text="Notificaciones" />
+
+                    <TextView
+                        android:id="@+id/perm_notif"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="18dp"
+                    android:background="@color/divider" />
+
+                <LinearLayout
+                    android:id="@+id/row_perm_battery"
+                    style="@style/SettingsRow">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView style="@style/SettingsTitle" android:text="Batería sin restricciones" />
+
+                        <TextView
+                            style="@style/SettingsDesc"
+                            android:text="Evita que Samsung duerma la app." />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/perm_battery"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:id="@+id/version_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:gravity="center"
+            android:textColor="@color/text_soft"
+            android:textSize="12sp" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

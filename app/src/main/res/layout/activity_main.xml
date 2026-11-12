@@ -3,49 +3,91 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:colorBackground">
+    android:background="@color/bg">
 
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
-        android:paddingBottom="96dp">
+        android:paddingBottom="112dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingStart="20dp"
+            android:paddingTop="20dp"
+            android:paddingEnd="20dp">
+
+            <!-- Encabezado -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="Recuérdame Aquí"
+                        android:textColor="@color/text"
+                        android:textSize="28sp" />
+
+                    <TextView
+                        android:id="@+id/header_sub"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/text_soft"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_settings"
+                    style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:contentDescription="Configuración"
+                    app:icon="@drawable/ic_settings" />
+            </LinearLayout>
 
             <!-- Aviso de permisos -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/banner"
+                style="@style/SoftCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
+                android:layout_marginTop="20dp"
                 android:visibility="gone"
-                app:cardBackgroundColor="@color/banner_bg"
-                app:cardElevation="0dp"
-                app:strokeWidth="0dp">
+                app:cardBackgroundColor="@color/banner_bg">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:padding="18dp">
 
                     <TextView
                         android:id="@+id/banner_text"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:lineSpacingExtra="2dp"
                         android:textColor="@color/banner_fg"
-                        android:textSize="15sp" />
+                        android:textSize="14sp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/banner_button"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp" />
+                        android:layout_marginTop="10dp"
+                        app:cornerRadius="20dp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -56,30 +98,41 @@
                 android:layout_height="wrap_content"
                 android:gravity="center_horizontal"
                 android:orientation="vertical"
-                android:paddingTop="48dp"
+                android:paddingTop="64dp"
                 android:visibility="gone">
 
-                <ImageView
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_pin"
-                    app:tint="?attr/colorPrimary" />
+                <FrameLayout
+                    android:layout_width="96dp"
+                    android:layout_height="96dp"
+                    android:background="@drawable/bg_circle_soft">
+
+                    <ImageView
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_pin"
+                        app:tint="@color/primary" />
+                </FrameLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:text="Todavía no tienes lugares"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
+                    android:layout_marginTop="24dp"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Nada pendiente por ahora"
+                    android:textColor="@color/text"
+                    android:textSize="20sp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="10dp"
                     android:gravity="center"
-                    android:text="Marca un lugar en el mapa y escribe qué tienes que hacer ahí.&#10;&#10;Al llegar: «Comprar pan y leche» cuando pases por el supermercado.&#10;Al salir: «No olvidar el cargador» cuando salgas de casa."
+                    android:lineSpacingExtra="4dp"
+                    android:maxWidth="320dp"
+                    android:text="Marca un lugar en el mapa y escribe qué tienes que hacer ahí. Te aviso cuando llegues o cuando salgas.&#10;&#10;«Comprar pan y leche» al llegar al supermercado&#10;«No olvidar el cargador» al salir de casa"
+                    android:textColor="@color/text_soft"
                     android:textSize="15sp" />
             </LinearLayout>
 
@@ -87,78 +140,10 @@
                 android:id="@+id/places_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
                 android:orientation="vertical" />
-
-            <!-- Sonido de los avisos -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="Avisos"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:alpha="0.75"
-                android:text="Suenan y vibran como un mensaje, y aparecen arriba en la pantalla. Si el teléfono está en silencio, solo vibran."
-                android:textSize="13sp" />
-
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/instant_switch"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Aviso al instante"
-                android:textSize="16sp" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:alpha="0.75"
-                android:text="Revisa tu GPS cada pocos segundos cuando estás cerca de un lugar y cada minuto cuando estás lejos. Deja un aviso fijo en la barra. Si lo apagas, Android avisa solo, pero puede tardar varios minutos."
-                android:textSize="13sp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/test_button"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Probar aviso" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/sound_button"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="Cambiar sonido" />
-            </LinearLayout>
-
-            <!-- Consejo para Samsung -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:alpha="0.75"
-                android:text="Consejo para Samsung: en Ajustes de la app → Batería, elige «Sin restricciones» para que los avisos lleguen siempre."
-                android:textSize="13sp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/battery_button"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Abrir ajustes de la app" />
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/fab_add"
@@ -166,6 +151,9 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="20dp"
-        android:text="Nuevo recordatorio"
-        app:icon="@drawable/ic_add" />
+        android:text="Nuevo"
+        android:textColor="@color/on_primary"
+        app:backgroundTint="@color/primary"
+        app:icon="@drawable/ic_add"
+        app:iconTint="@color/on_primary" />
 </FrameLayout>

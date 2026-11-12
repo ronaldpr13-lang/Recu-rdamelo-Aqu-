@@ -20,10 +20,9 @@ import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.textfield.TextInputEditText
@@ -71,12 +70,8 @@ class MainActivity : AppCompatActivity() {
         findViewById<ExtendedFloatingActionButton>(R.id.fab_add).setOnClickListener {
             startActivity(Intent(this, MapPickerActivity::class.java))
         }
-        findViewById<MaterialButton>(R.id.battery_button).setOnClickListener { openAppSettings() }
-        findViewById<MaterialButton>(R.id.test_button).setOnClickListener { testNotification() }
-        findViewById<MaterialButton>(R.id.sound_button).setOnClickListener { openSoundSettings() }
-        findViewById<MaterialSwitch>(R.id.instant_switch).apply {
-            isChecked = TrackerService.isEnabled(this@MainActivity)
-            setOnCheckedChangeListener { _, on -> TrackerService.setEnabled(this@MainActivity, on) }
+        findViewById<MaterialButton>(R.id.btn_settings).setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
 
         if (!GeofenceHelper.hasFine(this)) askForeground()
@@ -165,30 +160,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun testNotification() {
-        if (!GeofenceHelper.hasNotifications(this)) {
-            Toast.makeText(this, "Primero activa las notificaciones de la app", Toast.LENGTH_LONG).show()
-            openAppSettings()
-            return
-        }
-        Notifier.showTest(this)
-        Toast.makeText(this, "Así te llegará el aviso", Toast.LENGTH_SHORT).show()
-    }
-
-    /** Abre la pantalla de Android donde se escoge el sonido de estos avisos. */
-    private fun openSoundSettings() {
-        Notifier.ensureChannel(this)
-        val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
-            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-            .putExtra(Settings.EXTRA_CHANNEL_ID, Notifier.CHANNEL_ID)
-        try {
-            startActivity(intent)
-            Toast.makeText(this, "Toca «Sonido» y escoge el que quieras", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            openAppSettings()
-        }
-    }
-
     @SuppressLint("MissingPermission")
     private fun refreshMyLocation() {
         if (!GeofenceHelper.hasFine(this)) return
@@ -218,7 +189,14 @@ class MainActivity : AppCompatActivity() {
     private fun render() {
         val places = Store.load(this)
         container.removeAllViews()
+        val pendingAll = places.sumOf { it.pending.size }
         emptyView.visibility = if (places.isEmpty()) View.VISIBLE else View.GONE
+        findViewById<TextView>(R.id.header_sub).text = when {
+            places.isEmpty() -> "Tus recordatorios por lugar"
+            pendingAll == 0 -> "Todo al día"
+            pendingAll == 1 -> "1 cosa pendiente"
+            else -> "$pendingAll cosas pendientes"
+        }
 
         // Primero los que tienen pendientes; luego los más cercanos
         val sorted = places.sortedWith(
@@ -308,7 +286,7 @@ class MainActivity : AppCompatActivity() {
     private fun addNote(place: Place) {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_note, null)
         val input = view.findViewById<TextInputEditText>(R.id.dialog_note_input)
-        val group = view.findViewById<MaterialButtonToggleGroup>(R.id.dialog_trigger_group)
+        val group = view.findViewById<ChipGroup>(R.id.dialog_trigger_group)
         // Si el lugar ya tiene notas "al salir" (ej: la casa), sugerir esa opción
         if (place.notes.isNotEmpty() && place.notes.all { it.trigger == Trigger.LEAVE }) {
             group.check(R.id.dlg_leave)
@@ -320,7 +298,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Guardar") { _, _ ->
                 val text = input.text?.toString()?.trim().orEmpty()
                 if (text.isNotEmpty()) {
-                    val trigger = if (group.checkedButtonId == R.id.dlg_leave) Trigger.LEAVE else Trigger.ARRIVE
+                    val trigger = if (group.checkedChipId == R.id.dlg_leave) Trigger.LEAVE else Trigger.ARRIVE
                     Store.update(this) { list ->
                         list.find { it.id == place.id }?.notes?.add(Note(text = text, trigger = trigger))
                     }
