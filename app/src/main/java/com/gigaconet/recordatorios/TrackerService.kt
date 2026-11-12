@@ -23,16 +23,20 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import org.json.JSONObject
+import kotlin.math.abs
 
 /**
- * "Aviso al instante": vigila el GPS mientras haya notas pendientes.
- * Cerca de un lugar revisa cada pocos segundos; lejos, cada minuto, para cuidar la batería.
+ * "Aviso al instante", cuidando la batería:
+ * - Solo corre cuando estás cerca de un lugar (Android lo despierta con una zona grande alrededor).
+ * - Cerca del borde de un lugar revisa rápido con GPS; si estás quieto, revisa lento sin GPS.
+ * - Al alejarte de todo, se apaga solo y quita la notificación.
  */
 class TrackerService : Service() {
 
     companion object {
         private const val TAG = "Vigilancia"
-        private const val CHANNEL = "vigilancia"
+        private const val CHANNEL = "vigilancia_min"
+        private const val OLD_CHANNEL = "vigilancia"
         private const val NOTIF_ID = 77
         private const val PREFS = "tracker"
         private const val KEY_ENABLED = "enabled"
@@ -40,35 +44,66 @@ class TrackerService : Service() {
         private const val KEY_STATE_TS = "inside_state_ts"
         private const val STATE_MAX_AGE = 30 * 60_000L
 
-        private const val MODE_FAR = 0
-        private const val MODE_MID = 1
-        private const val MODE_NEAR = 2
+        /** Zona grande alrededor de cada lugar donde se activa la vigilancia rápida. */
+        const val APPROACH_MARGIN = 700f
+        private const val STOP_DISTANCE = 1500f
+
+        private const val MODE_FAST = 0   // GPS cada 5 s: a pocos metros del borde
+        private const val MODE_NORMAL = 1 // GPS cada 12 s: acercándote
+        private const val MODE_SLOW = 2   // sin GPS cada 30 s: quieto o algo lejos
 
         fun isEnabled(ctx: Context) =
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ENABLED, true)
 
         fun setEnabled(ctx: Context, on: Boolean) {
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, on).apply()
+            GeofenceHelper.syncAll(ctx)
             refresh(ctx)
         }
 
-        /** Arranca o detiene la vigilancia según haya notas pendientes. */
+        private fun pendingPlaces(ctx: Context) = Store.load(ctx).filter { it.pending.isNotEmpty() }
+
+        /**
+         * Arranca la vigilancia solo si estás cerca de algún lugar con pendientes;
+         * si no, la detiene (Android la despertará al acercarte).
+         */
+        @SuppressLint("MissingPermission")
         fun refresh(ctx: Context) {
             val app = ctx.applicationContext
-            val intent = Intent(app, TrackerService::class.java)
-            val need = isEnabled(app) && GeofenceHelper.hasFine(app) &&
-                Store.load(app).any { it.pending.isNotEmpty() }
+            val places = pendingPlaces(app)
+            if (!isEnabled(app) || !GeofenceHelper.hasFine(app) || places.isEmpty()) {
+                stop(app); return
+            }
+            LocationServices.getFusedLocationProviderClient(app).lastLocation
+                .addOnSuccessListener { loc ->
+                    val near = loc == null || places.any {
+                        it.distanceTo(loc.latitude, loc.longitude) - it.radius < APPROACH_MARGIN
+                    }
+                    // Sin permiso "todo el tiempo" las zonas de Android no funcionan: vigilar siempre
+                    if (near || !GeofenceHelper.hasBackground(app)) start(app) else stop(app)
+                }
+                .addOnFailureListener { start(app) }
+        }
+
+        fun start(ctx: Context) {
             try {
-                if (need) ContextCompat.startForegroundService(app, intent) else app.stopService(intent)
+                ContextCompat.startForegroundService(ctx, Intent(ctx, TrackerService::class.java))
             } catch (e: Exception) {
                 Log.w(TAG, "No se pudo iniciar la vigilancia", e)
             }
+        }
+
+        fun stop(ctx: Context) {
+            ctx.stopService(Intent(ctx, TrackerService::class.java))
         }
     }
 
     private lateinit var client: FusedLocationProviderClient
     private var mode = -1
-    private var shownCount = -1
+    private var shownText = ""
+    private var anchor: Location? = null
+    private var anchorTime = 0L
+    private var farCount = 0
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -84,24 +119,23 @@ class TrackerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val count = Store.load(this).count { it.pending.isNotEmpty() }
-        // Android exige mostrar el aviso fijo enseguida, aunque luego se detenga
+        // Android exige mostrar la notificación enseguida, aunque luego se detenga
         try {
             val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
-            ServiceCompat.startForeground(this, NOTIF_ID, buildNotification(count), type)
-            shownCount = count
+            shownText = "Revisando si estás cerca de tus lugares"
+            ServiceCompat.startForeground(this, NOTIF_ID, buildNotification(shownText), type)
         } catch (e: Exception) {
             Log.w(TAG, "startForeground falló", e)
             stopSelf()
             return START_NOT_STICKY
         }
-        if (count == 0 || !GeofenceHelper.hasFine(this) || !isEnabled(this)) {
+        if (pendingPlaces(this).isEmpty() || !GeofenceHelper.hasFine(this) || !isEnabled(this)) {
             stopSelf()
             return START_NOT_STICKY
         }
-        if (mode == -1) request(MODE_NEAR) // primera lectura rápida
-        return START_STICKY
+        if (mode == -1) request(MODE_NORMAL)
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
@@ -114,12 +148,12 @@ class TrackerService : Service() {
         if (newMode == mode) return
         mode = newMode
         val req = when (newMode) {
-            MODE_FAR -> LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 60_000)
-                .setMinUpdateIntervalMillis(30_000).build()
-            MODE_MID -> LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 15_000)
+            MODE_FAST -> LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5_000)
+                .setMinUpdateIntervalMillis(3_000).build()
+            MODE_NORMAL -> LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 12_000)
                 .setMinUpdateIntervalMillis(8_000).build()
-            else -> LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 4_000)
-                .setMinUpdateIntervalMillis(2_000).build()
+            else -> LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 30_000)
+                .setMinUpdateIntervalMillis(20_000).build()
         }
         try {
             client.removeLocationUpdates(callback)
@@ -130,48 +164,77 @@ class TrackerService : Service() {
     }
 
     private fun onFix(loc: Location) {
-        val places = Store.load(this).filter { it.pending.isNotEmpty() }
+        val places = pendingPlaces(this)
         if (places.isEmpty()) { stopSelf(); return }
 
         val state = loadState()
         val acc = if (loc.hasAccuracy()) loc.accuracy else 50f
-        var nearestEdge = Float.MAX_VALUE
+        var nearestBoundary = Float.MAX_VALUE // distancia al borde que importa
+        var nearestName = ""
+        var nearestAny = Float.MAX_VALUE
 
         for (p in places) {
             val d = p.distanceTo(loc.latitude, loc.longitude)
-            nearestEdge = minOf(nearestEdge, d - p.radius)
-            if (acc > maxOf(60f, p.radius)) continue // lectura del GPS muy imprecisa
+            nearestAny = minOf(nearestAny, d - p.radius)
 
-            val wasInside = state[p.id]
-            val inside = if (wasInside == true) {
-                d <= p.radius + maxOf(25f, acc) // margen para no avisar dos veces al borde
-            } else {
-                d <= p.radius
+            if (acc <= maxOf(60f, p.radius)) { // ignorar lecturas muy imprecisas
+                val wasInside = state[p.id]
+                val inside = if (wasInside == true) d <= p.radius + maxOf(25f, acc) else d <= p.radius
+                if (wasInside == null) {
+                    state[p.id] = inside // primera lectura: solo recordar dónde estás
+                } else if (inside != wasInside) {
+                    state[p.id] = inside
+                    val t = if (inside) Trigger.ARRIVE else Trigger.LEAVE
+                    Notifier.show(this, p, p.pendingFor(t), t)
+                }
             }
-            if (wasInside == null) {
-                state[p.id] = inside // primera lectura: solo recordar dónde estás
-                continue
-            }
-            if (inside != wasInside) {
-                state[p.id] = inside
-                val t = if (inside) Trigger.ARRIVE else Trigger.LEAVE
-                Notifier.show(this, p, p.pendingFor(t), t)
+
+            // ¿Este borde importa? Dentro solo si hay notas "al salir"; fuera solo si hay "al llegar".
+            val inside = state[p.id] ?: (d <= p.radius)
+            val matters = if (inside) p.pendingFor(Trigger.LEAVE).isNotEmpty()
+            else p.pendingFor(Trigger.ARRIVE).isNotEmpty()
+            if (matters) {
+                val b = abs(d - p.radius)
+                if (b < nearestBoundary) { nearestBoundary = b; nearestName = p.name }
             }
         }
         state.keys.retainAll(places.map { it.id }.toSet())
         saveState(state)
 
-        if (places.size != shownCount) {
-            shownCount = places.size
-            getSystemService(NotificationManager::class.java).notify(NOTIF_ID, buildNotification(places.size))
+        // Lejos de todo: apagarse; Android la vuelve a despertar al acercarte
+        if (nearestAny > STOP_DISTANCE && GeofenceHelper.hasBackground(this)) {
+            if (++farCount >= 2) { stopSelf(); return }
+        } else farCount = 0
+
+        // ¿Estás quieto? (no te has movido más de 30 m en 2 minutos)
+        val now = System.currentTimeMillis()
+        val a = anchor
+        if (a == null || a.distanceTo(loc) > 30f) { anchor = loc; anchorTime = now }
+        val stillFor = now - anchorTime
+        val still = stillFor > 2 * 60_000
+
+        // Quieto un rato: apagarse para no gastar batería. Al moverte, el sensor de
+        // movimiento la vuelve a encender; y la zona del lugar sigue avisando de respaldo.
+        if (GeofenceHelper.hasBackground(this) &&
+            (stillFor > 4 * 60_000 || (nearestBoundary == Float.MAX_VALUE && stillFor > 60_000))
+        ) {
+            stopSelf(); return
         }
-        request(
-            when {
-                nearestEdge > 3000 -> MODE_FAR
-                nearestEdge > 600 -> MODE_MID
-                else -> MODE_NEAR
-            }
-        )
+
+        val newMode = when {
+            nearestBoundary == Float.MAX_VALUE -> MODE_SLOW
+            still -> MODE_SLOW
+            nearestBoundary < 200f -> MODE_FAST
+            nearestBoundary < 800f -> MODE_NORMAL
+            else -> MODE_SLOW
+        }
+        request(newMode)
+
+        val text = if (nearestName.isNotEmpty()) "Cerca de $nearestName" else "Cerca de tus lugares"
+        if (text != shownText) {
+            shownText = text
+            getSystemService(NotificationManager::class.java).notify(NOTIF_ID, buildNotification(text))
+        }
     }
 
     // ---------- Recordar si estás dentro o fuera de cada lugar ----------
@@ -197,13 +260,14 @@ class TrackerService : Service() {
             .apply()
     }
 
-    // ---------- Aviso fijo en la barra ----------
+    // ---------- Notificación fija (Android la exige mientras usa la ubicación) ----------
 
-    private fun buildNotification(count: Int): android.app.Notification {
+    private fun buildNotification(text: String): android.app.Notification {
         val nm = getSystemService(NotificationManager::class.java)
+        nm.deleteNotificationChannel(OLD_CHANNEL)
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Vigilancia activa", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Aviso fijo mientras la app revisa tu ubicación"
+            NotificationChannel(CHANNEL, "Vigilancia cerca de tus lugares", NotificationManager.IMPORTANCE_MIN).apply {
+                description = "Aparece solo cuando estás cerca de un lugar con pendientes"
                 setShowBadge(false)
             }
         )
@@ -212,19 +276,20 @@ class TrackerService : Service() {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val text = when (count) {
-            0 -> "Sin pendientes"
-            1 -> "1 lugar con pendientes. Te aviso al instante."
-            else -> "$count lugares con pendientes. Te aviso al instante."
-        }
+        val off = PendingIntent.getBroadcast(
+            this, 1,
+            Intent(this, ActionReceiver::class.java).setAction(ActionReceiver.ACTION_INSTANT_OFF),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notif)
-            .setContentTitle("Recuérdame Aquí está atento")
-            .setContentText(text)
+            .setContentTitle(text)
+            .setContentText("Te aviso al instante. Se quita sola al alejarte.")
             .setOngoing(true)
             .setSilent(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
             .setContentIntent(open)
+            .addAction(0, "Apagar", off)
             .build()
     }
 }

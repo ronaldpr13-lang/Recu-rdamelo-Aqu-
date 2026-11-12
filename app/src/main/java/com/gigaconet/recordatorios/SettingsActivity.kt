@@ -78,6 +78,7 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        findViewById<MaterialSwitch>(R.id.instant_switch).isChecked = TrackerService.isEnabled(this)
         setStatus(R.id.perm_location, GeofenceHelper.hasFine(this) && GeofenceHelper.hasBackground(this))
         setStatus(R.id.perm_notif, GeofenceHelper.hasNotifications(this))
         setStatus(R.id.perm_battery, ignoresBattery())

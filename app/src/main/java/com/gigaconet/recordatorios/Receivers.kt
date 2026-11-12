@@ -25,8 +25,13 @@ class GeofenceReceiver : BroadcastReceiver() {
             else -> return
         }
 
+        val fences = event.triggeringGeofences.orEmpty()
+        // Te acercas a un lugar: encender la vigilancia rápida
+        if (fences.any { it.requestId.startsWith(GeofenceHelper.NEAR_PREFIX) }) {
+            if (TrackerService.isEnabled(context)) TrackerService.start(context)
+        }
         val places = Store.load(context)
-        event.triggeringGeofences?.forEach { fence ->
+        fences.forEach { fence ->
             val place = places.find { it.id == fence.requestId } ?: return@forEach
             Notifier.show(context, place, place.pendingFor(trigger), trigger)
         }
@@ -39,9 +44,14 @@ class ActionReceiver : BroadcastReceiver() {
         const val ACTION_DONE = "com.gigaconet.recordatorios.DONE"
         const val EXTRA_PLACE_ID = "place_id"
         const val EXTRA_TRIGGER = "trigger"
+        const val ACTION_INSTANT_OFF = "com.gigaconet.recordatorios.INSTANT_OFF"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == ACTION_INSTANT_OFF) {
+            TrackerService.setEnabled(context, false)
+            return
+        }
         if (intent.action != ACTION_DONE) return
         val placeId = intent.getStringExtra(EXTRA_PLACE_ID) ?: return
         val trigger = if (intent.getStringExtra(EXTRA_TRIGGER) == "LEAVE") Trigger.LEAVE else Trigger.ARRIVE

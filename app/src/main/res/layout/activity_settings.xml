@@ -119,7 +119,7 @@
 
                         <TextView
                             style="@style/SettingsDesc"
-                            android:text="Revisa el GPS cada pocos segundos cerca de tus lugares. Deja un ícono fijo en la barra." />
+                            android:text="Cuando estás cerca de un lugar, revisa tu ubicación seguido para avisarte enseguida. Lejos no gasta batería. Si lo apagas, el aviso puede tardar unos minutos." />
                     </LinearLayout>
 
                     <com.google.android.material.materialswitch.MaterialSwitch

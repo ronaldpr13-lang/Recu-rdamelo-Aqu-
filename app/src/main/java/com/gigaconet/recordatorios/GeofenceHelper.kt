@@ -21,12 +21,17 @@ import com.google.android.gms.location.LocationServices
 object GeofenceHelper {
     private const val TAG = "Geovallas"
     private const val MAX_FENCES = 100 // límite de Android por app
+    const val NEAR_PREFIX = "near:"
 
     fun hasFine(ctx: Context) = granted(ctx, Manifest.permission.ACCESS_FINE_LOCATION)
 
     fun hasBackground(ctx: Context) =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
             granted(ctx, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+
+    fun hasActivity(ctx: Context) =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+            granted(ctx, Manifest.permission.ACTIVITY_RECOGNITION)
 
     fun hasNotifications(ctx: Context) =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
@@ -51,22 +56,35 @@ object GeofenceHelper {
         val client = LocationServices.getGeofencingClient(ctx)
         val pi = pendingIntent(ctx)
 
+        Motion.sync(ctx)
         client.removeGeofences(pi).addOnCompleteListener {
             if (!hasFine(ctx) || !hasBackground(ctx)) {
                 onDone?.invoke(); return@addOnCompleteListener
             }
-            val fences = Store.load(ctx).mapNotNull { p ->
+            val instant = TrackerService.isEnabled(ctx)
+            val fences = Store.load(ctx).flatMap { p ->
                 var transitions = 0
                 if (p.pendingFor(Trigger.ARRIVE).isNotEmpty()) transitions = transitions or Geofence.GEOFENCE_TRANSITION_ENTER
                 if (p.pendingFor(Trigger.LEAVE).isNotEmpty()) transitions = transitions or Geofence.GEOFENCE_TRANSITION_EXIT
-                if (transitions == 0) null
-                else Geofence.Builder()
-                    .setRequestId(p.id)
-                    .setCircularRegion(p.lat, p.lng, p.radius)
+                if (transitions == 0) return@flatMap emptyList<Geofence>()
+                val list = mutableListOf(
+                    Geofence.Builder()
+                        .setRequestId(p.id)
+                        .setCircularRegion(p.lat, p.lng, p.radius)
+                        .setExpirationDuration(Geofence.NEVER_EXPIRE)
+                        .setTransitionTypes(transitions)
+                        .setNotificationResponsiveness(30_000)
+                        .build()
+                )
+                // Zona grande: al entrar despierta el "aviso al instante" (casi sin gastar batería)
+                if (instant) list += Geofence.Builder()
+                    .setRequestId(NEAR_PREFIX + p.id)
+                    .setCircularRegion(p.lat, p.lng, p.radius + TrackerService.APPROACH_MARGIN)
                     .setExpirationDuration(Geofence.NEVER_EXPIRE)
-                    .setTransitionTypes(transitions)
-                    .setNotificationResponsiveness(30_000)
+                    .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
+                    .setNotificationResponsiveness(60_000)
                     .build()
+                list
             }.take(MAX_FENCES)
 
             if (fences.isEmpty()) {

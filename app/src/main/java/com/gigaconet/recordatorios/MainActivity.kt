@@ -49,6 +49,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val activityLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { GeofenceHelper.syncAll(this) }
+
     private val backgroundLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
@@ -75,6 +79,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (!GeofenceHelper.hasFine(this)) askForeground()
+        else if (!GeofenceHelper.hasActivity(this) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Para ahorrar batería: saber cuándo empiezas a moverte
+            activityLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        }
     }
 
     override fun onResume() {
@@ -106,6 +114,9 @@ class MainActivity : AppCompatActivity() {
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             perms += Manifest.permission.POST_NOTIFICATIONS
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            perms += Manifest.permission.ACTIVITY_RECOGNITION
         }
         foregroundLauncher.launch(perms.toTypedArray())
     }

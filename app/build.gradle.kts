@@ -11,8 +11,8 @@ android {
         applicationId = "com.gigaconet.recordatorios"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "4.4"
+        versionCode = 11
+        versionName = "4.5"
     }
 
     // Firma fija: así cada versión nueva se instala encima sin borrar tus notas
