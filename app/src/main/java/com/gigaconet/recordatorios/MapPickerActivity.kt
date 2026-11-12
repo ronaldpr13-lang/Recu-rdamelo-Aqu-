@@ -1,7 +1,12 @@
 package com.gigaconet.recordatorios
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.os.Bundle
+import android.view.MotionEvent
 import android.os.Handler
 import android.os.Looper
 import android.view.View
@@ -162,6 +167,9 @@ class MapPickerActivity : AppCompatActivity() {
             })
             map.overlays.add(Marker(map).apply {
                 position = GeoPoint(p.lat, p.lng)
+                icon = ContextCompat.getDrawable(this@MapPickerActivity, R.drawable.ic_pin)?.mutate()?.also {
+                    it.setTint(ContextCompat.getColor(this@MapPickerActivity, R.color.text_soft))
+                }
                 title = p.name
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 setOnMarkerClickListener { m, _ ->
@@ -181,11 +189,17 @@ class MapPickerActivity : AppCompatActivity() {
 
         // Punto azul: dónde estás tú ahora mismo
         if (GeofenceHelper.hasFine(this)) {
-            myDot = MyLocationNewOverlay(GpsMyLocationProvider(this), map).also { map.overlays.add(it) }
+            myDot = MyLocationNewOverlay(GpsMyLocationProvider(this), map).also {
+                val dot = blueDot()
+                it.setDirectionArrow(dot, dot)
+                it.setPersonAnchor(0.5f, 0.5f)
+                it.setDirectionAnchor(0.5f, 0.5f)
+                map.overlays.add(it)
+            }
         }
 
         // Girar el mapa con dos dedos
-        map.overlays.add(RotationGestureOverlay(map).apply { isEnabled = true })
+        map.overlays.add(SoftRotation(map).apply { isEnabled = true })
 
         // Tocar el mapa lleva el pin a ese punto
         map.overlays.add(0, MapEventsOverlay(object : MapEventsReceiver {
@@ -235,6 +249,27 @@ class MapPickerActivity : AppCompatActivity() {
             updateNorth()
         }
 
+        // Deslizar el panel hacia abajo = mapa completo
+        val sheet = findViewById<View>(R.id.sheet)
+        val dp = resources.displayMetrics.density
+        var downY = 0f
+        findViewById<View>(R.id.sheet_header).setOnTouchListener { v, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { downY = e.rawY; true }
+                MotionEvent.ACTION_MOVE -> {
+                    sheet.translationY = (e.rawY - downY).coerceAtLeast(0f); true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    val dy = e.rawY - downY
+                    if (dy > 70 * dp) setFullMap(true)
+                    else sheet.animate().translationY(0f).setDuration(150).start()
+                    if (kotlin.math.abs(dy) < 8 * dp) v.performClick()
+                    true
+                }
+                else -> false
+            }
+        }
+
         // Mapa a pantalla completa
         findViewById<MaterialButton>(R.id.fab_expand).setOnClickListener { setFullMap(!fullMap) }
         findViewById<MaterialButton>(R.id.btn_confirm_point).setOnClickListener { setFullMap(false) }
@@ -251,7 +286,20 @@ class MapPickerActivity : AppCompatActivity() {
         fullMap = on
         fullMapBack.isEnabled = on
         getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(map.windowToken, 0)
-        findViewById<View>(R.id.sheet).visibility = if (on) View.GONE else View.VISIBLE
+        val sheet = findViewById<View>(R.id.sheet)
+        val keep = center() // el mapa cambia de tamaño: mantener el mismo punto en el centro
+        if (on) {
+            sheet.animate().translationY(sheet.height.toFloat()).setDuration(200).withEndAction {
+                sheet.visibility = View.GONE
+                sheet.translationY = 0f
+                map.post { map.controller.setCenter(keep); onCenterMoved() }
+            }.start()
+        } else {
+            sheet.visibility = View.VISIBLE
+            sheet.translationY = sheet.height.toFloat()
+            sheet.animate().translationY(0f).setDuration(220).start()
+            map.post { map.controller.setCenter(keep); onCenterMoved() }
+        }
         findViewById<View>(R.id.btn_confirm_point).visibility = if (on) View.VISIBLE else View.GONE
         findViewById<MaterialButton>(R.id.fab_expand).apply {
             setIconResource(if (on) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen)
@@ -265,7 +313,19 @@ class MapPickerActivity : AppCompatActivity() {
                 ((if (on) base + 64 else base) * dp).toInt()
             v.requestLayout()
         }
-        map.post { onCenterMoved() }
+    }
+
+    /** Punto azul con borde blanco para tu ubicación. */
+    private fun blueDot(): Bitmap {
+        val size = (24 * resources.displayMetrics.density).toInt()
+        val b = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val c = Canvas(b)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        val r = size / 2f
+        p.color = Color.argb(60, 47, 128, 237); c.drawCircle(r, r, r, p)
+        p.color = Color.WHITE; c.drawCircle(r, r, r * 0.55f, p)
+        p.color = Color.rgb(47, 128, 237); c.drawCircle(r, r, r * 0.4f, p)
+        return b
     }
 
     /** Marca el atajo si el nombre coincide; si no, "Otro…" con el nombre escrito. */
