@@ -37,6 +37,7 @@ import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.views.overlay.TilesOverlay
+import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import kotlin.math.roundToInt
@@ -72,6 +73,13 @@ class MapPickerActivity : AppCompatActivity() {
 
     private var editing: Place? = null
     private var fullMap = false
+    private lateinit var northBtn: MaterialButton
+    private val compassTick = object : Runnable {
+        override fun run() {
+            updateNorth()
+            handler.postDelayed(this, 200)
+        }
+    }
     private lateinit var fullMapBack: OnBackPressedCallback
     private var radius = 200f
     private var lastAddress = ""
@@ -176,6 +184,9 @@ class MapPickerActivity : AppCompatActivity() {
             myDot = MyLocationNewOverlay(GpsMyLocationProvider(this), map).also { map.overlays.add(it) }
         }
 
+        // Girar el mapa con dos dedos
+        map.overlays.add(RotationGestureOverlay(map).apply { isEnabled = true })
+
         // Tocar el mapa lleva el pin a ese punto
         map.overlays.add(0, MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
@@ -215,6 +226,14 @@ class MapPickerActivity : AppCompatActivity() {
             if (actionId == EditorInfo.IME_ACTION_SEARCH) { doSearch(); true } else false
         }
         findViewById<MaterialButton>(R.id.btn_search).setOnClickListener { doSearch() }
+
+        // Brújula: vuelve a poner el norte arriba
+        northBtn = findViewById(R.id.btn_north)
+        northBtn.setOnClickListener {
+            map.mapOrientation = 0f
+            map.invalidate()
+            updateNorth()
+        }
 
         // Mapa a pantalla completa
         findViewById<MaterialButton>(R.id.fab_expand).setOnClickListener { setFullMap(!fullMap) }
@@ -268,8 +287,23 @@ class MapPickerActivity : AppCompatActivity() {
         return findViewById<Chip>(id).text.toString()
     }
 
-    override fun onResume() { super.onResume(); map.onResume(); myDot?.enableMyLocation() }
-    override fun onPause() { myDot?.disableMyLocation(); super.onPause(); map.onPause() }
+    override fun onResume() {
+        super.onResume(); map.onResume(); myDot?.enableMyLocation()
+        handler.post(compassTick)
+    }
+
+    override fun onPause() {
+        handler.removeCallbacks(compassTick)
+        myDot?.disableMyLocation(); super.onPause(); map.onPause()
+    }
+
+    /** Muestra la brújula solo cuando el mapa está girado, apuntando al norte. */
+    private fun updateNorth() {
+        val o = ((map.mapOrientation % 360f) + 360f) % 360f
+        val rotated = o > 1f && o < 359f
+        northBtn.visibility = if (rotated) View.VISIBLE else View.GONE
+        northBtn.rotation = -map.mapOrientation
+    }
     override fun onDestroy() { handler.removeCallbacksAndMessages(null); super.onDestroy() }
 
     // ---------- Mapa ----------

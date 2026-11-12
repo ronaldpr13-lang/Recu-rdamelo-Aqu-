@@ -83,6 +83,20 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Brújula: aparece cuando giras el mapa; tócala para volver al norte -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_north"
+            style="@style/MapRoundButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="76dp"
+            android:layout_marginEnd="14dp"
+            android:contentDescription="Poner el norte arriba"
+            android:visibility="gone"
+            app:icon="@drawable/ic_north"
+            app:iconTint="@null" />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/fab_expand"
             style="@style/MapRoundButton"
