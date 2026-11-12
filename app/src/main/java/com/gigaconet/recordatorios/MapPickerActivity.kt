@@ -9,6 +9,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
@@ -70,6 +71,8 @@ class MapPickerActivity : AppCompatActivity() {
     private var myDot: MyLocationNewOverlay? = null
 
     private var editing: Place? = null
+    private var fullMap = false
+    private lateinit var fullMapBack: OnBackPressedCallback
     private var radius = 200f
     private var lastAddress = ""
     private var geocodeTicket = 0
@@ -213,7 +216,37 @@ class MapPickerActivity : AppCompatActivity() {
         }
         findViewById<MaterialButton>(R.id.btn_search).setOnClickListener { doSearch() }
 
+        // Mapa a pantalla completa
+        findViewById<MaterialButton>(R.id.fab_expand).setOnClickListener { setFullMap(!fullMap) }
+        findViewById<MaterialButton>(R.id.btn_confirm_point).setOnClickListener { setFullMap(false) }
+        fullMapBack = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() = setFullMap(false)
+        }
+        onBackPressedDispatcher.addCallback(this, fullMapBack)
+
         findViewById<MaterialButton>(R.id.btn_save).setOnClickListener { save() }
+    }
+
+    /** Esconde el panel para ver todo el mapa; "Usar este punto" lo vuelve a mostrar. */
+    private fun setFullMap(on: Boolean) {
+        fullMap = on
+        fullMapBack.isEnabled = on
+        getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(map.windowToken, 0)
+        findViewById<View>(R.id.sheet).visibility = if (on) View.GONE else View.VISIBLE
+        findViewById<View>(R.id.btn_confirm_point).visibility = if (on) View.VISIBLE else View.GONE
+        findViewById<MaterialButton>(R.id.fab_expand).apply {
+            setIconResource(if (on) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen)
+            contentDescription = if (on) "Volver al formulario" else "Ver mapa completo"
+        }
+        val dp = resources.displayMetrics.density
+        // Subir los botones redondos para que no choquen con "Usar este punto"
+        listOf(R.id.fab_location to 40, R.id.fab_expand to 104).forEach { (id, base) ->
+            val v = findViewById<View>(id)
+            (v.layoutParams as android.widget.FrameLayout.LayoutParams).bottomMargin =
+                ((if (on) base + 64 else base) * dp).toInt()
+            v.requestLayout()
+        }
+        map.post { onCenterMoved() }
     }
 
     /** Marca el atajo si el nombre coincide; si no, "Otro…" con el nombre escrito. */

@@ -84,6 +84,31 @@
         </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/fab_expand"
+            style="@style/MapRoundButton"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="104dp"
+            android:contentDescription="Ver mapa completo"
+            app:icon="@drawable/ic_fullscreen" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_confirm_point"
+            style="@style/PillButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="28dp"
+            android:elevation="4dp"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp"
+            android:text="Usar este punto"
+            android:visibility="gone"
+            app:icon="@drawable/ic_check" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/fab_location"
             style="@style/MapRoundButton"
             android:layout_width="52dp"
@@ -109,6 +134,7 @@
 
     <!-- Panel inferior -->
     <LinearLayout
+        android:id="@+id/sheet"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="-24dp"
