@@ -61,7 +61,7 @@ class TrackerService : Service() {
             refresh(ctx)
         }
 
-        private fun pendingPlaces(ctx: Context) = Store.load(ctx).filter { it.pending.isNotEmpty() }
+        private fun pendingPlaces(ctx: Context) = Store.active(ctx).filter { it.pending.isNotEmpty() }
 
         /**
          * Arranca la vigilancia solo si estás cerca de algún lugar con pendientes;

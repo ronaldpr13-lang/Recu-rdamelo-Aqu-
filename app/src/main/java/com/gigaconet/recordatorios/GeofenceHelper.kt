@@ -62,30 +62,61 @@ object GeofenceHelper {
                 onDone?.invoke(); return@addOnCompleteListener
             }
             val instant = TrackerService.isEnabled(ctx)
-            val fences = Store.load(ctx).flatMap { p ->
+            val all = Store.active(ctx)
+
+            fun mainFence(p: Place): Geofence? {
                 var transitions = 0
                 if (p.pendingFor(Trigger.ARRIVE).isNotEmpty()) transitions = transitions or Geofence.GEOFENCE_TRANSITION_ENTER
                 if (p.pendingFor(Trigger.LEAVE).isNotEmpty()) transitions = transitions or Geofence.GEOFENCE_TRANSITION_EXIT
-                if (transitions == 0) return@flatMap emptyList<Geofence>()
-                val list = mutableListOf(
-                    Geofence.Builder()
-                        .setRequestId(p.id)
-                        .setCircularRegion(p.lat, p.lng, p.radius)
-                        .setExpirationDuration(Geofence.NEVER_EXPIRE)
-                        .setTransitionTypes(transitions)
-                        .setNotificationResponsiveness(30_000)
-                        .build()
-                )
-                // Zona grande: al entrar despierta el "aviso al instante" (casi sin gastar batería)
-                if (instant) list += Geofence.Builder()
+                if (transitions == 0) return null
+                return Geofence.Builder()
+                    .setRequestId(p.id)
+                    .setCircularRegion(p.lat, p.lng, p.radius)
+                    .setExpirationDuration(Geofence.NEVER_EXPIRE)
+                    .setTransitionTypes(transitions)
+                    .setNotificationResponsiveness(30_000)
+                    .build()
+            }
+
+            // Zona grande: al entrar despierta el "aviso al instante" (casi sin gastar batería)
+            fun nearFence(p: Place): Geofence? {
+                if (p.pending.isEmpty()) return null
+                return Geofence.Builder()
                     .setRequestId(NEAR_PREFIX + p.id)
                     .setCircularRegion(p.lat, p.lng, p.radius + TrackerService.APPROACH_MARGIN)
                     .setExpirationDuration(Geofence.NEVER_EXPIRE)
                     .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
                     .setNotificationResponsiveness(60_000)
                     .build()
-                list
-            }.take(MAX_FENCES)
+            }
+
+            val real = all.filter { !Chains.isVirtual(it.id) }
+            val center = Chains.center(ctx)
+            val branches = all.filter { Chains.isVirtual(it.id) && it.pending.isNotEmpty() }
+                .let { list ->
+                    if (center == null) list
+                    else list.sortedBy { it.distanceTo(center.first, center.second) }
+                }
+
+            val fences = mutableListOf<Geofence>()
+            // Primero tus lugares guardados (siempre caben), luego las sucursales más cercanas.
+            real.forEach { p ->
+                mainFence(p)?.let { fences += it }
+                if (instant) nearFence(p)?.let { fences += it }
+            }
+            // Al salir de esta zona se buscan las sucursales de tu nueva ubicación
+            if (center != null && branches.isNotEmpty()) {
+                fences += Geofence.Builder()
+                    .setRequestId(Chains.RING_ID)
+                    .setCircularRegion(center.first, center.second, Chains.RING_RADIUS_M)
+                    .setExpirationDuration(Geofence.NEVER_EXPIRE)
+                    .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_EXIT)
+                    .setNotificationResponsiveness(60_000)
+                    .build()
+            }
+            branches.take(35).forEach { p -> mainFence(p)?.let { fences += it } }
+            if (instant) branches.take(12).forEach { p -> nearFence(p)?.let { fences += it } }
+            if (fences.size > MAX_FENCES) fences.subList(MAX_FENCES, fences.size).clear()
 
             if (fences.isEmpty()) {
                 onDone?.invoke(); return@addOnCompleteListener

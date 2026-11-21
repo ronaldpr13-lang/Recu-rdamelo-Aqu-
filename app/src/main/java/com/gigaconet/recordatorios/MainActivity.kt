@@ -20,6 +20,7 @@ import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
@@ -71,13 +72,12 @@ class MainActivity : AppCompatActivity() {
         bannerText = findViewById(R.id.banner_text)
         bannerButton = findViewById(R.id.banner_button)
 
-        findViewById<ExtendedFloatingActionButton>(R.id.fab_add).setOnClickListener {
-            startActivity(Intent(this, MapPickerActivity::class.java))
-        }
+        findViewById<ExtendedFloatingActionButton>(R.id.fab_add).setOnClickListener { chooseKind() }
         findViewById<MaterialButton>(R.id.btn_settings).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
+        Chains.schedulePeriodic(this)
         if (!GeofenceHelper.hasFine(this)) askForeground()
         else if (!GeofenceHelper.hasActivity(this) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             // Para ahorrar batería: saber cuándo empiezas a moverte
@@ -85,8 +85,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        Chains.onUpdated = { if (!isFinishing) render() }
+    }
+
+    override fun onStop() {
+        Chains.onUpdated = null
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
+        // Si hace mucho que no se buscan sucursales, buscar de nuevo
+        if (System.currentTimeMillis() - Chains.lastSearchTime(this) > 6 * 3_600_000L &&
+            Store.load(this).any { it.chain != null }
+        ) Chains.refresh(this)
         render()
         updateBanner()
         refreshMyLocation()
@@ -195,7 +209,15 @@ class MainActivity : AppCompatActivity() {
 
     // ---------- Lista de lugares ----------
 
-    private fun distanceTo(p: Place): Float? = myLocation?.let { p.distanceTo(it.latitude, it.longitude) }
+    private fun distanceTo(p: Place): Float? {
+        val loc = myLocation ?: return null
+        if (p.chain != null) {
+            return Chains.branches(this, p.id)?.minOfOrNull {
+                Place(name = "", lat = it.lat, lng = it.lng, radius = 0f).distanceTo(loc.latitude, loc.longitude)
+            }
+        }
+        return p.distanceTo(loc.latitude, loc.longitude)
+    }
 
     private fun render() {
         val places = Store.load(this)
@@ -218,14 +240,28 @@ class MainActivity : AppCompatActivity() {
             val card = LayoutInflater.from(this).inflate(R.layout.item_place, container, false)
             card.findViewById<TextView>(R.id.place_name).text = place.name
 
+            val isChain = place.chain != null
             val addressView = card.findViewById<TextView>(R.id.place_address)
-            val showAddress = place.address.isNotBlank() && !place.address.startsWith(place.name)
+            val showAddress = isChain || (place.address.isNotBlank() && !place.address.startsWith(place.name))
             addressView.visibility = if (showAddress) View.VISIBLE else View.GONE
-            addressView.text = place.address
+            addressView.text = if (isChain) "Cualquier sucursal" else place.address
 
             val pendingCount = place.pending.size
             card.findViewById<TextView>(R.id.place_info).text = buildList {
-                distanceTo(place)?.let { d ->
+                if (isChain) {
+                    val br = Chains.branches(this@MainActivity, place.id)
+                    when {
+                        br == null -> add("Buscando sucursales cerca…")
+                        br.isEmpty() -> add("Sin sucursales a 8 km; reviso al moverte")
+                        else -> {
+                            val near = distanceTo(place)
+                            add(
+                                "${br.size} sucursales cerca" +
+                                    (near?.let { " (la más cercana a ${Geo.distanceText(it)})" } ?: "")
+                            )
+                        }
+                    }
+                } else distanceTo(place)?.let { d ->
                     val acc = myLocation?.accuracy ?: 0f
                     add("Estás a ${Geo.distanceText(d)}" + if (acc > 20) " (GPS ±${acc.toInt()} m)" else "")
                 }
@@ -278,8 +314,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun showPlaceMenu(anchor: View, place: Place) {
         PopupMenu(this, anchor).apply {
-            menu.add(0, 1, 0, "Editar lugar y distancia")
-            menu.add(0, 2, 1, "Borrar lugar")
+            if (place.chain != null) {
+                menu.add(0, 3, 0, "Cambiar distancia")
+                menu.add(0, 4, 1, "Buscar sucursales de nuevo")
+            } else {
+                menu.add(0, 1, 0, "Editar lugar y distancia")
+            }
+            menu.add(0, 2, 2, if (place.chain != null) "Borrar aviso" else "Borrar lugar")
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     1 -> startActivity(
@@ -287,6 +328,11 @@ class MainActivity : AppCompatActivity() {
                             .putExtra(MapPickerActivity.EXTRA_PLACE_ID, place.id)
                     )
                     2 -> confirmDeletePlace(place)
+                    3 -> pickChainRadius(place)
+                    4 -> {
+                        Toast.makeText(this@MainActivity, "Buscando sucursales cerca de ti…", Toast.LENGTH_SHORT).show()
+                        Chains.refresh(this@MainActivity)
+                    }
                 }
                 true
             }
@@ -294,12 +340,94 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ---------- Aviso por comercio (cualquier sucursal) ----------
+
+    private fun chooseKind() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("¿Qué quieres recordar?")
+            .setItems(
+                arrayOf(
+                    "En un lugar del mapa\nCasa, una tienda específica…",
+                    "En cualquier sucursal\nBanco Reservas, farmacia, supermercado…"
+                )
+            ) { _, which ->
+                if (which == 0) startActivity(Intent(this, MapPickerActivity::class.java))
+                else addChain()
+            }
+            .show()
+    }
+
+    private fun addChain() {
+        val view = LayoutInflater.from(this).inflate(R.layout.dialog_chain, null)
+        val name = view.findViewById<TextInputEditText>(R.id.chain_name)
+        val note = view.findViewById<TextInputEditText>(R.id.chain_note)
+        val radiusGroup = view.findViewById<ChipGroup>(R.id.chain_radius)
+        val suggestions = view.findViewById<ChipGroup>(R.id.chain_suggestions)
+        for (i in 0 until suggestions.childCount) {
+            (suggestions.getChildAt(i) as? Chip)?.setOnClickListener { name.setText((it as Chip).text) }
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Aviso por comercio")
+            .setView(view)
+            .setPositiveButton("Guardar") { _, _ ->
+                val brand = name.text?.toString()?.trim().orEmpty()
+                val text = note.text?.toString()?.trim().orEmpty()
+                if (brand.isEmpty() || text.isEmpty()) {
+                    Toast.makeText(this, "Escribe el comercio y qué tienes que hacer", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                val radius = when (radiusGroup.checkedChipId) {
+                    R.id.cr_100 -> 100f
+                    R.id.cr_400 -> 400f
+                    R.id.cr_800 -> 800f
+                    else -> 200f
+                }
+                Store.update(this) { list ->
+                    val existing = list.find { it.chain != null && it.name.equals(brand, ignoreCase = true) }
+                    if (existing != null) {
+                        existing.notes.add(Note(text = text))
+                        existing.radius = radius
+                    } else {
+                        list.add(
+                            Place(
+                                name = brand, lat = 0.0, lng = 0.0, radius = radius,
+                                notes = mutableListOf(Note(text = text)), chain = brand
+                            )
+                        )
+                    }
+                }
+                Toast.makeText(this, "Buscando sucursales de $brand cerca de ti…", Toast.LENGTH_LONG).show()
+                Chains.refresh(this)
+                changed()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+        name.requestFocus()
+    }
+
+    private fun pickChainRadius(place: Place) {
+        val options = floatArrayOf(100f, 200f, 400f, 800f)
+        var chosen = options.indexOfFirst { it == place.radius }.let { if (it < 0) 1 else it }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Avisar a menos de")
+            .setSingleChoiceItems(options.map { Geo.distanceText(it) }.toTypedArray(), chosen) { _, i -> chosen = i }
+            .setPositiveButton("Guardar") { _, _ ->
+                Store.update(this) { list -> list.find { it.id == place.id }?.radius = options[chosen] }
+                changed()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     private fun addNote(place: Place) {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_note, null)
         val input = view.findViewById<TextInputEditText>(R.id.dialog_note_input)
         val group = view.findViewById<ChipGroup>(R.id.dialog_trigger_group)
         // Si el lugar ya tiene notas "al salir" (ej: la casa), sugerir esa opción
-        if (place.notes.isNotEmpty() && place.notes.all { it.trigger == Trigger.LEAVE }) {
+        if (place.chain != null) {
+            group.visibility = View.GONE // en un comercio solo se avisa al pasar cerca
+        } else if (place.notes.isNotEmpty() && place.notes.all { it.trigger == Trigger.LEAVE }) {
             group.check(R.id.dlg_leave)
         }
 
@@ -309,10 +437,11 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Guardar") { _, _ ->
                 val text = input.text?.toString()?.trim().orEmpty()
                 if (text.isNotEmpty()) {
-                    val trigger = if (group.checkedChipId == R.id.dlg_leave) Trigger.LEAVE else Trigger.ARRIVE
+                    val trigger = if (place.chain == null && group.checkedChipId == R.id.dlg_leave) Trigger.LEAVE else Trigger.ARRIVE
                     Store.update(this) { list ->
                         list.find { it.id == place.id }?.notes?.add(Note(text = text, trigger = trigger))
                     }
+                    if (place.chain != null) Chains.refresh(this)
                     changed()
                 }
             }
@@ -345,7 +474,10 @@ class MainActivity : AppCompatActivity() {
     private fun confirmDeletePlace(place: Place) {
         MaterialAlertDialogBuilder(this)
             .setTitle("¿Borrar ${place.name}?")
-            .setMessage("Se borran el lugar y sus ${place.notes.size} notas. No se puede deshacer.")
+            .setMessage(
+                if (place.chain != null) "Se borra este aviso y sus ${place.notes.size} notas. No se puede deshacer."
+                else "Se borran el lugar y sus ${place.notes.size} notas. No se puede deshacer."
+            )
             .setPositiveButton("Borrar") { _, _ ->
                 Store.update(this) { list -> list.removeAll { it.id == place.id } }
                 changed()

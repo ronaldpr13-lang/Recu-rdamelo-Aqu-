@@ -26,11 +26,13 @@ class GeofenceReceiver : BroadcastReceiver() {
         }
 
         val fences = event.triggeringGeofences.orEmpty()
+        // Saliste de la zona donde se buscaron sucursales: buscar las de tu nueva zona
+        if (fences.any { it.requestId == Chains.RING_ID }) Chains.refresh(context)
         // Te acercas a un lugar: encender la vigilancia rápida
         if (fences.any { it.requestId.startsWith(GeofenceHelper.NEAR_PREFIX) }) {
             if (TrackerService.isEnabled(context)) TrackerService.start(context)
         }
-        val places = Store.load(context)
+        val places = Store.active(context)
         fences.forEach { fence ->
             val place = places.find { it.id == fence.requestId } ?: return@forEach
             Notifier.show(context, place, place.pendingFor(trigger), trigger)
@@ -72,6 +74,7 @@ class BootReceiver : BroadcastReceiver() {
             intent.action == Intent.ACTION_MY_PACKAGE_REPLACED
         ) {
             TrackerService.refresh(context)
+            Chains.refresh(context)
             val result = goAsync()
             GeofenceHelper.syncAll(context) { result.finish() }
         }

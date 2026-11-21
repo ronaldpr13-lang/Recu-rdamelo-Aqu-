@@ -11,8 +11,8 @@ android {
         applicationId = "com.gigaconet.recordatorios"
         minSdk = 26
         targetSdk = 34
-        versionCode = 11
-        versionName = "4.5"
+        versionCode = 12
+        versionName = "5.0"
     }
 
     // Firma fija: así cada versión nueva se instala encima sin borrar tus notas
@@ -48,4 +48,6 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.3.0")
     // Mapa gratis de OpenStreetMap (no pide tarjeta ni clave)
     implementation("org.osmdroid:osmdroid-android:6.1.18")
+    // Búsqueda periódica de sucursales en segundo plano
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 }

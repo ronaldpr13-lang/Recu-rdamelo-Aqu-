@@ -83,12 +83,14 @@ object Notifier {
     fun show(ctx: Context, place: Place, notes: List<Note>, trigger: Trigger) {
         if (notes.isEmpty() || !GeofenceHelper.hasNotifications(ctx)) return
         ensureChannel(ctx)
-        val id = notificationId(place.id, trigger)
+        val baseId = Chains.baseId(place.id) // sucursales del mismo comercio comparten aviso
+        val id = notificationId(baseId, trigger)
 
         // El GPS rápido y Android pueden detectar lo mismo: no sonar dos veces
         val prefs = ctx.getSharedPreferences("ultimos_avisos", Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        if (now - prefs.getLong(id.toString(), 0) < 3 * 60_000) return
+        val window = if (Chains.isVirtual(place.id)) 10 * 60_000L else 3 * 60_000L
+        if (now - prefs.getLong(id.toString(), 0) < window) return
         prefs.edit().putLong(id.toString(), now).apply()
 
         val openIntent = Intent(ctx, MainActivity::class.java)
@@ -100,7 +102,7 @@ object Notifier {
 
         val doneIntent = Intent(ctx, ActionReceiver::class.java)
             .setAction(ActionReceiver.ACTION_DONE)
-            .putExtra(ActionReceiver.EXTRA_PLACE_ID, place.id)
+            .putExtra(ActionReceiver.EXTRA_PLACE_ID, baseId)
             .putExtra(ActionReceiver.EXTRA_TRIGGER, trigger.name)
         val done = PendingIntent.getBroadcast(
             ctx, id, doneIntent,

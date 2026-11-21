@@ -23,7 +23,9 @@ data class Place(
     var lat: Double,
     var lng: Double,
     var radius: Float,
-    val notes: MutableList<Note> = mutableListOf()
+    val notes: MutableList<Note> = mutableListOf(),
+    /** Si no es null, es un aviso por comercio (cualquier sucursal) y lat/lng no se usan. */
+    var chain: String? = null
 ) {
     val pending: List<Note> get() = notes.filter { !it.done }
     fun pendingFor(t: Trigger) = pending.filter { it.trigger == t }
@@ -69,7 +71,8 @@ object Store {
                     lat = o.getDouble("lat"),
                     lng = o.getDouble("lng"),
                     radius = o.getDouble("radius").toFloat(),
-                    notes = notes
+                    notes = notes,
+                    chain = o.optString("chain", "").ifBlank { null }
                 )
             }
         } catch (e: Exception) {
@@ -93,9 +96,19 @@ object Store {
                     .put("lat", p.lat).put("lng", p.lng)
                     .put("radius", p.radius.toDouble())
                     .put("notes", notes)
+                    .apply { p.chain?.let { put("chain", it) } }
             )
         }
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, arr.toString()).apply()
+    }
+
+    /**
+     * Lugares que vigila el teléfono: los guardados con mapa + una "sucursal virtual"
+     * por cada sucursal encontrada de los avisos por comercio.
+     */
+    fun active(ctx: Context): List<Place> {
+        val all = load(ctx)
+        return all.filter { it.chain == null } + Chains.virtualPlaces(ctx, all.filter { it.chain != null })
     }
 
     /** Carga, aplica un cambio y guarda en un solo paso. */

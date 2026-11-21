@@ -131,7 +131,7 @@
                     android:gravity="center"
                     android:lineSpacingExtra="4dp"
                     android:maxWidth="320dp"
-                    android:text="Marca un lugar en el mapa y escribe qué tienes que hacer ahí. Te aviso cuando llegues o cuando salgas.&#10;&#10;«Comprar pan y leche» al llegar al supermercado&#10;«No olvidar el cargador» al salir de casa"
+                    android:text="Marca un lugar en el mapa y escribe qué tienes que hacer ahí. Te aviso cuando llegues o cuando salgas.&#10;&#10;«Comprar pan y leche» al llegar al supermercado&#10;«No olvidar el cargador» al salir de casa&#10;«Pagar la tarjeta» en cualquier sucursal del banco"
                     android:textColor="@color/text_soft"
                     android:textSize="15sp" />
             </LinearLayout>

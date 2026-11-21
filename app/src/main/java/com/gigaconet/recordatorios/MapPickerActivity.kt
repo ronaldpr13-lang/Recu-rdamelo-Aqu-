@@ -102,7 +102,7 @@ class MapPickerActivity : AppCompatActivity() {
         setContentView(R.layout.activity_map)
         findViewById<MaterialButton>(R.id.btn_back).setOnClickListener { finish() }
 
-        val all = Store.load(this)
+        val all = Store.load(this).filter { it.chain == null }
         editing = intent.getStringExtra(EXTRA_PLACE_ID)?.let { id -> all.find { it.id == id } }
         val ed = editing
         findViewById<TextView>(R.id.sheet_title).text = if (ed != null) "Editar lugar" else "Nuevo recordatorio"
@@ -532,7 +532,7 @@ class MapPickerActivity : AppCompatActivity() {
         var savedIn = ""
         Store.update(this) { list ->
             // Si ya tienes un lugar en ese mismo punto, la nota se agrega ahí
-            val near = list.minByOrNull { it.distanceTo(c.latitude, c.longitude) }
+            val near = list.filter { it.chain == null }.minByOrNull { it.distanceTo(c.latitude, c.longitude) }
                 ?.takeIf {
                     it.distanceTo(c.latitude, c.longitude) <= 40f &&
                         (typedName.isEmpty() || typedName.equals(it.name, ignoreCase = true))
